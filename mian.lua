@@ -1241,14 +1241,33 @@ function Tab:Dropdown(opts)
         opts.Default = opts.Default[1]
     end
     local multi = opts.Multi == true
-    local rawOptions = opts.Options or {}
+    local ROW = DROPDOWN_OPTION_HEIGHT
+    local GAP = 4
+    local MAX_ROWS = opts.MaxVisible or 7
+    local SEARCH_THRESHOLD = opts.SearchAfter or 6
+    local MAX_CHIP = 220
 
-    local options = {}
-    for _, v in ipairs(rawOptions) do
-        if type(v) == "table" then
-            table.insert(options, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
+    local function parseOptions(raw)
+        local list = {}
+        for _, v in ipairs(raw) do
+            if type(v) == "table" then
+                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
+            else
+                table.insert(list, { Name = tostring(v), Icon = nil })
+            end
+        end
+        return list
+    end
+    local options = parseOptions(opts.Options or {})
+
+    local function isRawImage(icon)
+        return type(icon) == "string" and (icon:find("^rbx") ~= nil or icon:find("^http") ~= nil)
+    end
+    local function setIcon(image, icon)
+        if type(icon) == "string" and icon:find("^rbxthumb://") then
+            image.Image = icon
         else
-            table.insert(options, { Name = tostring(v), Icon = nil })
+            applyIcon(image, icon)
         end
     end
 
@@ -1268,7 +1287,7 @@ function Tab:Dropdown(opts)
     local chip = create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -10, 0.5, 0),
-        Size = UDim2.fromOffset(60, CHIP_HEIGHT),
+        Size = UDim2.fromOffset(70, CHIP_HEIGHT),
         BackgroundColor3 = Theme.Surface,
         BorderSizePixel = 0,
         ClipsDescendants = true,
@@ -1276,20 +1295,29 @@ function Tab:Dropdown(opts)
     })
     corner(chip, UDim.new(0, 6))
     local chipStroke = stroke(chip)
+
     local valueLabel = label({
         Position = UDim2.fromOffset(10, 0),
-        Size = UDim2.new(1, -34, 1, 0),
+        Size = UDim2.new(1, -38, 1, 0),
         TextColor3 = Theme.Muted,
         TextSize = 13,
+        Parent = chip,
+    })
+
+    local measure = label({
+        Position = UDim2.fromOffset(-2000, 0),
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        TextSize = 13,
+        TextTransparency = 1,
         TextTruncate = Enum.TextTruncate.None,
-        ClipsDescendants = true,
         Parent = chip,
     })
 
     local countBadge = create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -30, 0.5, 0),
-        Size = UDim2.fromOffset(0, 18),
+        Position = UDim2.new(1, -48, 0.5, 0),
+        Size = UDim2.fromOffset(18, 18),
         BackgroundColor3 = Theme.Accent,
         BorderSizePixel = 0,
         Visible = false,
@@ -1297,8 +1325,7 @@ function Tab:Dropdown(opts)
     })
     corner(countBadge, UDim.new(0, 4))
     local countLabel = label({
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromScale(1, 1),
         Text = "0",
         TextSize = 11,
         TextColor3 = Theme.AccentDark,
@@ -1306,89 +1333,69 @@ function Tab:Dropdown(opts)
         TextTruncate = Enum.TextTruncate.None,
         Parent = countBadge,
     })
-    padding(countBadge, 4, 4)
 
-    local arrow = arrowIndicator(chip, 1, -6)
-    local measure = label({
-        Size = UDim2.fromOffset(0, CHIP_HEIGHT),
-        AutomaticSize = Enum.AutomaticSize.X,
-        TextSize = 13,
+    local clearButton = create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -26, 0.5, 0),
+        Size = UDim2.fromOffset(18, 18),
+        BackgroundTransparency = 1,
+        Text = "×",
+        TextColor3 = Theme.Muted,
+        TextSize = 17,
+        FontFace = Fonts.Medium,
+        AutoButtonColor = false,
         Visible = false,
+        ZIndex = 2,
         Parent = chip,
     })
-    local fullText = ""
-    local function trimmed()
-        local maxText = 190 - 10 - 34
-        measure.Text = fullText
-        if measure.TextBounds.X <= maxText then
-            return fullText
-        end
-        local text = fullText
-        while #text > 1 do
-            text = text:sub(1, -2)
-            measure.Text = text .. ".."
-            if measure.TextBounds.X <= maxText then
-                return text .. ".."
-            end
-        end
-        return ".."
-    end
-    local function fitChip(instant)
-        local width = math.clamp(valueLabel.TextBounds.X + 10 + 34, 60, 190)
-        reserveRight(titleLabel, descLabel, width + 20)
-        if instant then
-            chip.Size = UDim2.fromOffset(width, CHIP_HEIGHT)
-        else
-            tween(chip, { Size = UDim2.fromOffset(width, CHIP_HEIGHT) }, 0.2)
-        end
-    end
-    valueLabel:GetPropertyChangedSignal("TextBounds"):Connect(function()
-        fitChip(false)
+    clearButton.MouseEnter:Connect(function()
+        tween(clearButton, { TextColor3 = Theme.Text }, 0.12)
+    end)
+    clearButton.MouseLeave:Connect(function()
+        tween(clearButton, { TextColor3 = Theme.Muted }, 0.2)
     end)
 
-    local listHolder = create("Frame", {
-        Position = UDim2.new(0, 10, 0, height),
+    local arrow = arrowIndicator(chip, 1, -6)
+
+    local listHolder = create("CanvasGroup", {
+        Position = UDim2.new(0, 10, 0, height + 2),
         Size = UDim2.new(1, -20, 0, 0),
         BackgroundTransparency = 1,
+        GroupTransparency = 1,
+        Visible = false,
         Parent = frame,
     })
     create("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
+        Padding = UDim.new(0, GAP),
         Parent = listHolder,
     })
 
-    local self_ = { Open = false }
-    local selected = {}
-    local optionButtons = {}
-    local filter = ""
-    local SEARCH_THRESHOLD = opts.SearchAfter or 6
-
-    local searchHolder = create("TextButton", {
-        Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
+    local searchRow = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, ROW),
         BackgroundColor3 = Theme.Surface,
-        BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
-        LayoutOrder = 0,
+        LayoutOrder = 1,
         Visible = false,
         Parent = listHolder,
     })
-    corner(searchHolder, UDim.new(0, 6))
-    local searchStroke = stroke(searchHolder, Theme.Stroke, 1)
+    corner(searchRow, UDim.new(0, 6))
+    local searchStroke = stroke(searchRow, Theme.Stroke)
     local searchIcon = create("ImageLabel", {
-        Position = UDim2.fromOffset(12, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0, 21, 0.5, 0),
         Size = UDim2.fromOffset(16, 16),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Muted,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = searchHolder,
+        Parent = searchRow,
     })
     applyIcon(searchIcon, "lucide:search")
     local searchBox = create("TextBox", {
-        Position = UDim2.fromOffset(36, 0),
-        Size = UDim2.new(1, -48, 1, 0),
+        Position = UDim2.fromOffset(38, 0),
+        Size = UDim2.new(1, -50, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
         PlaceholderText = "Search...",
@@ -1398,58 +1405,93 @@ function Tab:Dropdown(opts)
         FontFace = Fonts.Regular,
         TextXAlignment = Enum.TextXAlignment.Left,
         ClearTextOnFocus = false,
-        TextTransparency = 1,
-        Parent = searchHolder,
+        Parent = searchRow,
     })
+    searchRow.MouseButton1Click:Connect(function()
+        searchBox:CaptureFocus()
+    end)
+    searchBox.Focused:Connect(function()
+        tween(searchStroke, { Color = Theme.StrokeHover }, 0.15)
+    end)
+    searchBox.FocusLost:Connect(function()
+        tween(searchStroke, { Color = Theme.Stroke }, 0.15)
+    end)
 
-
-    local selectAllHolder = create("TextButton", {
-        Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
-        BackgroundColor3 = Theme.Surface,
+    local selectAllRow = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, ROW),
+        BackgroundColor3 = Theme.Surface3,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Text = "",
         AutoButtonColor = false,
-        LayoutOrder = 0, 
+        LayoutOrder = 2,
         Visible = false,
         Parent = listHolder,
     })
-    corner(selectAllHolder, UDim.new(0, 6))
-    local selectAllStroke = stroke(selectAllHolder, Theme.Stroke, 1)
+    corner(selectAllRow, UDim.new(0, 6))
     local selectAllIcon = create("ImageLabel", {
-        Position = UDim2.fromOffset(12, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0, 21, 0.5, 0),
         Size = UDim2.fromOffset(16, 16),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Muted,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = selectAllHolder,
+        Parent = selectAllRow,
     })
     applyIcon(selectAllIcon, "lucide:list")
     local selectAllLabel = label({
-        Position = UDim2.fromOffset(36, 0),
-        Size = UDim2.new(1, -48, 1, 0),
+        Position = UDim2.fromOffset(38, 0),
+        Size = UDim2.new(1, -62, 1, 0),
         Text = "Select all",
         TextSize = 13,
-        TextColor3 = Theme.Muted,
-        TextTransparency = 1,
-        Parent = selectAllHolder,
+        TextColor3 = Theme.Text,
+        Parent = selectAllRow,
     })
     local selectAllCheck = create("ImageLabel", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -10, 0.5, 0),
+        Position = UDim2.new(1, -12, 0.5, 0),
         Size = UDim2.fromOffset(14, 14),
         BackgroundTransparency = 1,
         ImageColor3 = Theme.Accent,
         ImageTransparency = 1,
         ScaleType = Enum.ScaleType.Fit,
-        Parent = selectAllHolder,
+        Parent = selectAllRow,
     })
     applyIcon(selectAllCheck, "check")
-    local selectAllCheckScale = create("UIScale", { Scale = 1, Parent = selectAllCheck })
+    local selectAllCheckScale = create("UIScale", { Scale = 0.6, Parent = selectAllCheck })
 
-    local function matches(option)
-        return filter == "" or string.find(string.lower(option.Name), filter, 1, true) ~= nil
-    end
+    local optionsScroll = create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 0, ROW),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = Theme.Accent,
+        ScrollBarImageTransparency = 0.5,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(),
+        LayoutOrder = 3,
+        Parent = listHolder,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 2),
+        Parent = optionsScroll,
+    })
+    local noResults = label({
+        Size = UDim2.new(1, 0, 0, ROW),
+        Text = "No results",
+        TextSize = 13,
+        TextColor3 = Theme.Muted,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        LayoutOrder = 99999,
+        Visible = false,
+        Parent = optionsScroll,
+    })
+
+    local self_ = { Open = false }
+    local selected = {}
+    local optionButtons = {}
+    local filter = ""
 
     if multi then
         for _, value in ipairs(opts.Default or {}) do
@@ -1457,6 +1499,10 @@ function Tab:Dropdown(opts)
         end
     elseif opts.Default ~= nil then
         selected[opts.Default] = true
+    end
+
+    local function matches(option)
+        return filter == "" or string.find(string.lower(option.Name), filter, 1, true) ~= nil
     end
 
     local function currentValue()
@@ -1477,31 +1523,108 @@ function Tab:Dropdown(opts)
         return nil
     end
 
-    local function renderValueLabel()
-        local value = currentValue()
-        if multi then
-            local count = #value
-            if count > 0 then
-                fullText = table.concat(value, ", ")
-                countBadge.Visible = true
-                countLabel.Text = tostring(count)
-                countBadge.Size = UDim2.fromOffset(countLabel.TextBounds.X + 8, 18)
-
-                valueLabel.Size = UDim2.new(1, -34 - countBadge.AbsoluteSize.X - 6, 1, 0)
-            else
-                fullText = "None"
-                countBadge.Visible = false
-                valueLabel.Size = UDim2.new(1, -34, 1, 0)
+    local function visibleCount()
+        local count = 0
+        for _, option in ipairs(options) do
+            if matches(option) then
+                count += 1
             end
+        end
+        return count
+    end
+
+    local function optionsHeight()
+        local n = math.min(visibleCount(), MAX_ROWS)
+        if n == 0 then
+            return ROW
+        end
+        return n * ROW + (n - 1) * 2
+    end
+
+    local function layout(duration)
+        local showSearch = #options > SEARCH_THRESHOLD
+        local showAll = multi and #options > 0
+        searchRow.Visible = showSearch
+        selectAllRow.Visible = showAll
+
+        local scrollH = optionsHeight()
+        optionsScroll.Size = UDim2.new(1, 0, 0, scrollH)
+
+        local total, count = scrollH, 1
+        if showSearch then
+            total += ROW
+            count += 1
+        end
+        if showAll then
+            total += ROW
+            count += 1
+        end
+        total += (count - 1) * GAP
+        listHolder.Size = UDim2.new(1, -20, 0, total)
+
+        if self_.Open then
+            tween(frame, { Size = UDim2.new(1, 0, 0, height + 2 + total + 10) }, duration or 0.2, Enum.EasingStyle.Quint)
+        end
+    end
+
+    local function updateChip(instant)
+        local value = currentValue()
+        local count = 0
+        local fullText
+        if multi then
+            count = #value
+            fullText = count > 0 and table.concat(value, ", ") or "None"
         else
             fullText = value ~= nil and tostring(value) or "None"
-            countBadge.Visible = false
-            valueLabel.Size = UDim2.new(1, -34, 1, 0)
         end
-        valueLabel.Text = trimmed()
+        local hasValue = (multi and count > 0) or (not multi and value ~= nil)
+        valueLabel.Text = fullText
+        valueLabel.TextColor3 = hasValue and Theme.Text or Theme.Muted
 
-        local allSelected = true
-        local hasVisible = false
+        local reserve = 28
+        if multi and count > 0 then
+            local badgeW = math.max(18, #tostring(count) * 7 + 10)
+            countLabel.Text = tostring(count)
+            countBadge.Size = UDim2.fromOffset(badgeW, 18)
+            countBadge.Visible = true
+            clearButton.Visible = true
+            reserve = 54 + badgeW
+        else
+            countBadge.Visible = false
+            clearButton.Visible = false
+        end
+        valueLabel.Size = UDim2.new(1, -(10 + reserve), 1, 0)
+
+        measure.Text = fullText
+        local cardW = frame.AbsoluteSize.X / self.Window.Scale.Scale
+        local maxChip = cardW > 0 and math.clamp(cardW - 14 - 100 - 20, 100, MAX_CHIP) or MAX_CHIP
+        local width = math.clamp(measure.TextBounds.X + 10 + reserve + 2, 70, maxChip)
+        reserveRight(titleLabel, descLabel, width + 20)
+        if instant then
+            chip.Size = UDim2.fromOffset(width, CHIP_HEIGHT)
+        else
+            tween(chip, { Size = UDim2.fromOffset(width, CHIP_HEIGHT) }, 0.2)
+        end
+    end
+    measure:GetPropertyChangedSignal("TextBounds"):Connect(function()
+        updateChip(false)
+    end)
+    frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        updateChip(true)
+    end)
+
+    local function renderRows(animate)
+        for name, button in pairs(optionButtons) do
+            local on = selected[name] == true
+            local d = animate and 0.15 or 0
+            tween(button.Label, { TextColor3 = on and Theme.Text or Theme.Muted }, d)
+            tween(button.Check, { ImageTransparency = on and 0 or 1 }, d)
+            tween(button.CheckScale, { Scale = on and 1 or 0.6 }, animate and (on and 0.3 or 0.15) or 0, on and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
+            if button.Icon and not button.Raw then
+                tween(button.Icon, { ImageColor3 = on and Theme.Text or Theme.Muted }, d)
+            end
+        end
+        local allSelected, hasVisible = true, false
         for _, option in ipairs(options) do
             if matches(option) then
                 hasVisible = true
@@ -1511,256 +1634,194 @@ function Tab:Dropdown(opts)
                 end
             end
         end
-        if hasVisible and allSelected then
-            selectAllCheck.ImageTransparency = 0
-            selectAllCheckScale.Scale = 1
-        else
-            selectAllCheck.ImageTransparency = 1
-            selectAllCheckScale.Scale = 0.6
-        end
-
-        for optionName, button in pairs(optionButtons) do
-            local on = selected[optionName] == true
-            if button.On ~= on then
-                button.On = on
-                tween(button.Label, { TextColor3 = on and Theme.Text or Theme.Muted }, 0.15)
-                if self_.Open then
-                    tween(button.Check, { ImageTransparency = on and 0 or 1 }, 0.15)
-                    tween(button.CheckScale, { Scale = on and 1 or 0.6 }, on and 0.3 or 0.15, on and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
-                end
-            end
-        end
-    end
-
-    local function visibleCount()
-        local count = 0
-        for _, option in ipairs(options) do
-            if matches(option) then
-                count = count + 1
-            end
-        end
-        return count
+        local on = hasVisible and allSelected
+        tween(selectAllCheck, { ImageTransparency = on and 0 or 1 }, animate and 0.15 or 0)
+        tween(selectAllCheckScale, { Scale = on and 1 or 0.6 }, animate and 0.25 or 0, Enum.EasingStyle.Back)
+        updateChip(not animate)
     end
 
     local function applyFilter()
-        for optionName, button in pairs(optionButtons) do
-            local optData = nil
-            for _, o in ipairs(options) do
-                if o.Name == optionName then optData = o break end
-            end
-            if optData then
-                button.Frame.Visible = matches(optData)
+        for _, option in ipairs(options) do
+            local button = optionButtons[option.Name]
+            if button then
+                button.Frame.Visible = matches(option)
             end
         end
-    end
-
-    local function expandedHeight()
-        local rows = visibleCount()
-        if searchHolder.Visible then rows = rows + 1 end
-        if selectAllHolder.Visible then rows = rows + 1 end
-        return height + rows * (DROPDOWN_OPTION_HEIGHT + 4) + 8
+        noResults.Visible = visibleCount() == 0
+        layout(0.2)
+        renderRows(false)
     end
 
     local function setOpen(open)
+        if open == self_.Open then
+            return
+        end
         self_.Open = open
-        searchHolder.Visible = #options > SEARCH_THRESHOLD
-        selectAllHolder.Visible = multi and #options > 0
- 
-        local order = 1
-        if searchHolder.Visible then searchHolder.LayoutOrder = order; order = order + 1 end
-        if selectAllHolder.Visible then selectAllHolder.LayoutOrder = order; order = order + 1 end
-        for _, option in ipairs(options) do
-            local btn = optionButtons[option.Name]
-            if btn then btn.Frame.LayoutOrder = order; order = order + 1 end
-        end
-
-        if not open then
-            filter = ""
-            searchBox.Text = ""
-            applyFilter()
-        end
-        tween(frame, { Size = UDim2.new(1, 0, 0, open and expandedHeight() or height) }, 0.3, Enum.EasingStyle.Quint)
-        tween(searchHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
-        tween(searchStroke, { Transparency = open and 0 or 1 }, 0.2)
-        tween(searchBox, { TextTransparency = open and 0 or 1 }, 0.2)
-        tween(searchIcon, { ImageTransparency = open and 0 or 1 }, 0.2)
-        tween(selectAllHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
-        tween(selectAllStroke, { Transparency = open and 0 or 1 }, 0.2)
-        tween(selectAllLabel, { TextTransparency = open and 0 or 1 }, 0.2)
-        tween(selectAllIcon, { ImageTransparency = open and 0 or 1 }, 0.2)
-        tween(selectAllCheck, { ImageTransparency = (open and selectAllCheck.ImageTransparency == 0) and 0 or 1 }, 0.2)
+        local token = (self_._token or 0) + 1
+        self_._token = token
         arrow:Set(open)
         tween(chipStroke, { Color = open and Theme.StrokeHover or Theme.Stroke }, 0.2)
-        
-        local function show(button)
-            if not button.Stroke then
-                button.Stroke = stroke(button.Frame, Theme.Stroke, 1)
-            end
-            local on = open and button.On
-            tween(button.Check, { ImageTransparency = on and 0 or 1 }, 0.18)
-            button.CheckScale.Scale = on and 1 or 0.6
-            tween(button.Label, { TextTransparency = open and 0 or 1 }, 0.18)
-            tween(button.Stroke, { Transparency = open and 0 or 1 }, 0.18)
-            tween(button.Frame, { BackgroundTransparency = open and 0 or 1 }, 0.18)
-        end
         if open then
-            local generation = (self_._openGeneration or 0) + 1
-            self_._openGeneration = generation
-            task.spawn(function()
-                local first = true
-                for _, option in ipairs(options) do
-                    local button = optionButtons[option.Name]
-                    if button and button.Frame.Visible then
-                        if not first then
-                            task.wait(0.025)
-                            if self_._openGeneration ~= generation or not self_.Open then return end
-                        end
-                        first = false
-                        show(button)
-                    end
-                end
-            end)
+            listHolder.Visible = true
+            listHolder.GroupTransparency = 1
+            layout(0.3)
+            tween(listHolder, { GroupTransparency = 0 }, 0.25)
         else
-            local generation = (self_._openGeneration or 0) + 1
-            self_._openGeneration = generation
-            local visible = {}
-            for _, option in ipairs(options) do
-                local button = optionButtons[option.Name]
-                if button and button.Frame.Visible then table.insert(visible, button) end
-            end
-            task.spawn(function()
-                for index = #visible, 1, -1 do
-                    show(visible[index])
-                    if index > 1 then
-                        task.wait(0.015)
-                        if self_._openGeneration ~= generation or self_.Open then return end
-                    end
+            searchBox.Text = ""
+            tween(frame, { Size = UDim2.new(1, 0, 0, height) }, 0.3, Enum.EasingStyle.Quint)
+            tween(listHolder, { GroupTransparency = 1 }, 0.15)
+            task.delay(0.3, function()
+                if self_._token == token and not self_.Open then
+                    listHolder.Visible = false
                 end
             end)
         end
     end
 
     local function buildOptions()
-        local keep = {}
-        for index, option in ipairs(options) do keep[option.Name] = index end
-        for optionName, button in pairs(optionButtons) do
-            if not keep[optionName] then
-                button.Frame:Destroy()
-                optionButtons[optionName] = nil
+        for _, button in pairs(optionButtons) do
+            button.Frame:Destroy()
+        end
+        optionButtons = {}
+
+        local anyIcon = false
+        for _, option in ipairs(options) do
+            if option.Icon then
+                anyIcon = true
+                break
             end
         end
+        local textOffset = anyIcon and 38 or 12
+
         for index, option in ipairs(options) do
-            local existing = optionButtons[option.Name]
-            if existing then
-                existing.Frame.LayoutOrder = index + 2
-                continue
-            end
-            local button = create("TextButton", {
-                Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
-                BackgroundColor3 = Theme.Surface,
+            local row = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, ROW),
+                BackgroundColor3 = Theme.Surface3,
                 BackgroundTransparency = 1,
+                BorderSizePixel = 0,
                 Text = "",
                 AutoButtonColor = false,
-                LayoutOrder = index + 2,
-                Parent = listHolder,
+                LayoutOrder = index,
+                Parent = optionsScroll,
             })
-            corner(button, UDim.new(0, 6))
-            
-            local iconImage = nil
+            corner(row, UDim.new(0, 6))
+
+            local iconImage, raw = nil, false
             if option.Icon then
+                raw = isRawImage(option.Icon)
+                local size = raw and 22 or 16
                 iconImage = create("ImageLabel", {
-                    AnchorPoint = Vector2.new(0, 0.5),
-                    Position = UDim2.new(0, 10, 0.5, 0),
-                    Size = UDim2.fromOffset(16, 16),
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.new(0, 21, 0.5, 0),
+                    Size = UDim2.fromOffset(size, size),
                     BackgroundTransparency = 1,
-                    ImageColor3 = Theme.Muted, 
+                    ImageColor3 = raw and Color3.new(1, 1, 1) or Theme.Muted,
                     ScaleType = Enum.ScaleType.Fit,
-                    Parent = button,
+                    Parent = row,
                 })
-                applyIcon(iconImage, option.Icon)
+                if raw then
+                    corner(iconImage, UDim.new(0, 5))
+                end
+                setIcon(iconImage, option.Icon)
             end
 
-            local textOffset = option.Icon and 34 or 12
+            local text_ = label({
+                Position = UDim2.fromOffset(textOffset, 0),
+                Size = UDim2.new(1, -(textOffset + 30), 1, 0),
+                Text = option.Name,
+                TextSize = 13,
+                TextColor3 = Theme.Muted,
+                Parent = row,
+            })
             local check = create("ImageLabel", {
                 AnchorPoint = Vector2.new(1, 0.5),
-                Position = UDim2.new(1, -10, 0.5, 0),
+                Position = UDim2.new(1, -12, 0.5, 0),
                 Size = UDim2.fromOffset(14, 14),
                 BackgroundTransparency = 1,
                 ImageColor3 = Theme.Accent,
                 ImageTransparency = 1,
                 ScaleType = Enum.ScaleType.Fit,
-                Parent = button,
+                Parent = row,
             })
             applyIcon(check, "check")
             local checkScale = create("UIScale", { Scale = 0.6, Parent = check })
-            local text_ = label({
-                Position = UDim2.fromOffset(textOffset, -1),
-                Size = UDim2.new(1, -(textOffset + 24), 1, 0),
-                Text = option.Name,
-                TextSize = 13,
-                TextColor3 = Theme.Muted,
-                TextTransparency = 1,
-                Parent = button,
-            })
-            
-            button.MouseEnter:Connect(function()
-                tween(text_, { TextColor3 = Theme.Text }, 0.15)
-                if iconImage then tween(iconImage, { ImageColor3 = Theme.Text }, 0.15) end
-                local entry = optionButtons[option.Name]
-                if entry and entry.Stroke then tween(entry.Stroke, { Color = Theme.StrokeHover }, 0.12) end
-            end)
-            button.MouseLeave:Connect(function()
-                local isOn = selected[option.Name]
-                tween(text_, { TextColor3 = isOn and Theme.Text or Theme.Muted }, 0.2)
-                if iconImage then tween(iconImage, { ImageColor3 = isOn and Theme.Text or Theme.Muted }, 0.2) end
-                local entry = optionButtons[option.Name]
-                if entry and entry.Stroke then tween(entry.Stroke, { Color = Theme.Stroke }, 0.2) end
-            end)
-            button.MouseButton1Click:Connect(function()
-                if selected[option.Name] then
-                    selected[option.Name] = nil
-                else
-                    if not multi then selected = {} end
-                    selected[option.Name] = true
+
+            row.MouseEnter:Connect(function()
+                tween(row, { BackgroundTransparency = 0.45 }, 0.12)
+                tween(text_, { TextColor3 = Theme.Text }, 0.12)
+                if iconImage and not raw then
+                    tween(iconImage, { ImageColor3 = Theme.Text }, 0.12)
                 end
-                renderValueLabel()
-                safeCall(opts.Callback, currentValue())
-                if not multi and selected[option.Name] then setOpen(false) end
             end)
-            optionButtons[option.Name] = { Frame = button, Label = text_, Check = check, CheckScale = checkScale, Stroke = nil, On = nil, Icon = iconImage }
+            row.MouseLeave:Connect(function()
+                local on = selected[option.Name] == true
+                tween(row, { BackgroundTransparency = 1 }, 0.2)
+                tween(text_, { TextColor3 = on and Theme.Text or Theme.Muted }, 0.2)
+                if iconImage and not raw then
+                    tween(iconImage, { ImageColor3 = on and Theme.Text or Theme.Muted }, 0.2)
+                end
+            end)
+            row.MouseButton1Click:Connect(function()
+                if multi then
+                    if selected[option.Name] then
+                        selected[option.Name] = nil
+                    else
+                        selected[option.Name] = true
+                    end
+                else
+                    selected = { [option.Name] = true }
+                end
+                renderRows(true)
+                safeCall(opts.Callback, currentValue())
+                if not multi then
+                    setOpen(false)
+                end
+            end)
+
+            optionButtons[option.Name] = { Frame = row, Label = text_, Check = check, CheckScale = checkScale, Icon = iconImage, Raw = raw }
         end
-        applyFilter()
-        if self_.Open then frame.Size = UDim2.new(1, 0, 0, expandedHeight()) end
+        noResults.Visible = #options > 0 and visibleCount() == 0
+        layout(0.2)
     end
 
-    selectAllHolder.MouseButton1Click:Connect(function()
+    selectAllRow.MouseButton1Click:Connect(function()
         local allSelected = true
         for _, option in ipairs(options) do
             if matches(option) and not selected[option.Name] then
-                allSelected = false break
+                allSelected = false
+                break
             end
         end
         for _, option in ipairs(options) do
             if matches(option) then
-                if allSelected then
-                    selected[option.Name] = nil
-                else
-                    selected[option.Name] = true
-                end
+                selected[option.Name] = (not allSelected) or nil
             end
         end
-        renderValueLabel()
+        renderRows(true)
         safeCall(opts.Callback, currentValue())
     end)
-    selectAllHolder.MouseEnter:Connect(function()
-        tween(selectAllLabel, { TextColor3 = Theme.Text }, 0.15)
-        tween(selectAllIcon, { ImageColor3 = Theme.Text }, 0.15)
-        tween(selectAllStroke, { Color = Theme.StrokeHover }, 0.12)
+    selectAllRow.MouseEnter:Connect(function()
+        tween(selectAllRow, { BackgroundTransparency = 0.45 }, 0.12)
+        tween(selectAllIcon, { ImageColor3 = Theme.Text }, 0.12)
     end)
-    selectAllHolder.MouseLeave:Connect(function()
-        tween(selectAllLabel, { TextColor3 = Theme.Muted }, 0.2)
+    selectAllRow.MouseLeave:Connect(function()
+        tween(selectAllRow, { BackgroundTransparency = 1 }, 0.2)
         tween(selectAllIcon, { ImageColor3 = Theme.Muted }, 0.2)
-        tween(selectAllStroke, { Color = Theme.Stroke }, 0.2)
+    end)
+
+    clearButton.MouseButton1Click:Connect(function()
+        selected = {}
+        renderRows(true)
+        safeCall(opts.Callback, currentValue())
+    end)
+
+    header.MouseButton1Click:Connect(function()
+        setOpen(not self_.Open)
+    end)
+
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        filter = string.lower(searchBox.Text)
+        applyFilter()
     end)
 
     function self_:Set(value, silent)
@@ -1772,38 +1833,33 @@ function Tab:Dropdown(opts)
         elseif value ~= nil then
             selected[value] = true
         end
-        renderValueLabel()
+        renderRows(true)
         flashStroke(frameStroke)
-        if not silent then safeCall(opts.Callback, currentValue()) end
-    end
-
-    function self_:Get() return currentValue() end
-    function self_:Refresh(newOptions, keepSelection)
-        rawOptions = newOptions or {}
-        options = {}
-        for _, v in ipairs(rawOptions) do
-            if type(v) == "table" then
-                table.insert(options, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
-            else
-                table.insert(options, { Name = tostring(v), Icon = nil })
-            end
+        if not silent then
+            safeCall(opts.Callback, currentValue())
         end
-        if not keepSelection then selected = {} end
-        buildOptions()
-        renderValueLabel()
-        if self_.Open then setOpen(true) end
     end
-    function self_:SetOpen(open) setOpen(open == true) end
 
-    header.MouseButton1Click:Connect(function() setOpen(not self_.Open) end)
-    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        filter = string.lower(searchBox.Text)
-        applyFilter()
-        if self_.Open then tween(frame, { Size = UDim2.new(1, 0, 0, expandedHeight()) }, 0.2, Enum.EasingStyle.Quint) end
-    end)
+    function self_:Get()
+        return currentValue()
+    end
+
+    function self_:Refresh(newOptions, keepSelection)
+        options = parseOptions(newOptions or {})
+        if not keepSelection then
+            selected = {}
+        end
+        buildOptions()
+        renderRows(false)
+    end
+
+    function self_:SetOpen(open)
+        setOpen(open == true)
+    end
+
     buildOptions()
-    renderValueLabel()
-    task.defer(fitChip, true)
+    renderRows(false)
+    task.defer(updateChip, true)
     return finishElement(self, opts, self_, frame, "Dropdown")
 end
 
