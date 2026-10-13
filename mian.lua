@@ -1364,12 +1364,13 @@ function Tab:Dropdown(opts)
     local filter = ""
     local SEARCH_THRESHOLD = opts.SearchAfter or 6
 
-
-    local searchHolder = create("Frame", {
+    local searchHolder = create("TextButton", {
         Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
         BackgroundColor3 = Theme.Surface,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
         LayoutOrder = 0,
         Visible = false,
         Parent = listHolder,
@@ -1392,12 +1393,13 @@ function Tab:Dropdown(opts)
         Parent = searchHolder,
     })
 
-
-    local selectAllHolder = create("Frame", {
+    local selectAllHolder = create("TextButton", {
         Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
         BackgroundColor3 = Theme.Surface,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
         LayoutOrder = 0, 
         Visible = false,
         Parent = listHolder,
@@ -1462,7 +1464,6 @@ function Tab:Dropdown(opts)
             local count = #value
             if count > 0 then
                 fullText = table.concat(value, ", ")
-     
                 countBadge.Visible = true
                 countLabel.Text = tostring(count)
                 countBadge.Size = UDim2.fromOffset(countLabel.TextBounds.X + 8, 18)
