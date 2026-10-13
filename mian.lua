@@ -1251,7 +1251,7 @@ function Tab:Dropdown(opts)
         local list = {}
         for _, v in ipairs(raw) do
             if type(v) == "table" then
-                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
+                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model })
             else
                 table.insert(list, { Name = tostring(v), Icon = nil })
             end
@@ -1269,6 +1269,50 @@ function Tab:Dropdown(opts)
         else
             applyIcon(image, icon)
         end
+    end
+
+    local function buildFace(viewport, source)
+        pcall(function()
+            local wasArchivable = source.Archivable
+            source.Archivable = true
+            local clone = source:Clone()
+            source.Archivable = wasArchivable
+            if not clone then
+                return
+            end
+            for _, descendant in ipairs(clone:GetDescendants()) do
+                if descendant:IsA("LuaSourceContainer") then
+                    descendant:Destroy()
+                elseif descendant:IsA("Humanoid") then
+                    descendant.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                end
+            end
+            clone.Parent = viewport
+            local head = clone:FindFirstChild("Head", true)
+            local cframe, distance
+            if head and head:IsA("BasePart") then
+                cframe = head.CFrame
+                distance = head.Size.Y * 3.2
+            elseif clone:IsA("Model") then
+                local size
+                cframe, size = clone:GetBoundingBox()
+                distance = math.max(size.X, size.Y, size.Z) * 2.2
+            elseif clone:IsA("BasePart") then
+                cframe = clone.CFrame
+                distance = math.max(clone.Size.X, clone.Size.Y, clone.Size.Z) * 2.2
+            else
+                return
+            end
+            local target = cframe.Position
+            local camera = Instance.new("Camera")
+            camera.FieldOfView = 30
+            camera.CFrame = CFrame.lookAt(target + cframe.LookVector * distance, target)
+            camera.Parent = viewport
+            viewport.CurrentCamera = camera
+            viewport.Ambient = Color3.fromRGB(190, 190, 190)
+            viewport.LightColor = Color3.new(1, 1, 1)
+            viewport.LightDirection = -cframe.LookVector
+        end)
     end
 
     local frame, frameStroke, height
@@ -1717,7 +1761,19 @@ function Tab:Dropdown(opts)
             corner(row, UDim.new(0, 6))
 
             local iconImage, raw = nil, false
-            if option.Icon then
+            if typeof(option.Icon) == "Instance" then
+                raw = true
+                iconImage = create("ViewportFrame", {
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.new(0, 21, 0.5, 0),
+                    Size = UDim2.fromOffset(22, 22),
+                    BackgroundColor3 = Theme.Surface2,
+                    BorderSizePixel = 0,
+                    Parent = row,
+                })
+                corner(iconImage, UDim.new(0, 5))
+                buildFace(iconImage, option.Icon)
+            elseif option.Icon then
                 raw = isRawImage(option.Icon)
                 local size = raw and 22 or 16
                 iconImage = create("ImageLabel", {
