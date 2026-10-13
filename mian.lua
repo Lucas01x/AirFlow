@@ -1241,7 +1241,17 @@ function Tab:Dropdown(opts)
         opts.Default = opts.Default[1]
     end
     local multi = opts.Multi == true
-    local options = opts.Options or {}
+    local rawOptions = opts.Options or {}
+
+    local options = {}
+    for _, v in ipairs(rawOptions) do
+        if type(v) == "table" then
+            table.insert(options, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
+        else
+            table.insert(options, { Name = tostring(v), Icon = nil })
+        end
+    end
+
     local frame, frameStroke, height
     opts, frame, frameStroke, height = beginElement(self, opts, {}, "Frame")
     frame.ClipsDescendants = true
@@ -1275,6 +1285,29 @@ function Tab:Dropdown(opts)
         ClipsDescendants = true,
         Parent = chip,
     })
+
+    local countBadge = create("Frame", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -6, 0.5, 0),
+        Size = UDim2.fromOffset(0, 18),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        Visible = false,
+        Parent = chip,
+    })
+    corner(countBadge, UDim.new(0, 4))
+    local countLabel = label({
+        Size = UDim2.new(0, 0, 1, 0),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Text = "0",
+        TextSize = 11,
+        TextColor3 = Theme.AccentDark,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextTruncate = Enum.TextTruncate.None,
+        Parent = countBadge,
+    })
+    padding(countBadge, 4, 4)
+
     local arrow = arrowIndicator(chip, 1, -6)
     local measure = label({
         Size = UDim2.fromOffset(0, CHIP_HEIGHT),
@@ -1331,6 +1364,7 @@ function Tab:Dropdown(opts)
     local filter = ""
     local SEARCH_THRESHOLD = opts.SearchAfter or 6
 
+
     local searchHolder = create("Frame", {
         Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
         BackgroundColor3 = Theme.Surface,
@@ -1347,7 +1381,7 @@ function Tab:Dropdown(opts)
         Size = UDim2.new(1, -20, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
-        PlaceholderText = "Search",
+        PlaceholderText = "Search...",
         PlaceholderColor3 = Theme.Muted,
         TextColor3 = Theme.Text,
         TextSize = 13,
@@ -1358,8 +1392,42 @@ function Tab:Dropdown(opts)
         Parent = searchHolder,
     })
 
+
+    local selectAllHolder = create("Frame", {
+        Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
+        BackgroundColor3 = Theme.Surface,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        LayoutOrder = 0, 
+        Visible = false,
+        Parent = listHolder,
+    })
+    corner(selectAllHolder, UDim.new(0, 6))
+    local selectAllStroke = stroke(selectAllHolder, Theme.Stroke, 1)
+    local selectAllLabel = label({
+        Position = UDim2.fromOffset(12, 0),
+        Size = UDim2.new(1, -20, 1, 0),
+        Text = "Select all",
+        TextSize = 13,
+        TextColor3 = Theme.Muted,
+        TextTransparency = 1,
+        Parent = selectAllHolder,
+    })
+    local selectAllCheck = create("ImageLabel", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -10, 0.5, 0),
+        Size = UDim2.fromOffset(14, 14),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Accent,
+        ImageTransparency = 1,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = selectAllHolder,
+    })
+    applyIcon(selectAllCheck, "check")
+    local selectAllCheckScale = create("UIScale", { Scale = 1, Parent = selectAllCheck })
+
     local function matches(option)
-        return filter == "" or string.find(string.lower(tostring(option)), filter, 1, true) ~= nil
+        return filter == "" or string.find(string.lower(option.Name), filter, 1, true) ~= nil
     end
 
     if multi then
@@ -1374,15 +1442,15 @@ function Tab:Dropdown(opts)
         if multi then
             local list = {}
             for _, option in ipairs(options) do
-                if selected[option] then
-                    table.insert(list, option)
+                if selected[option.Name] then
+                    table.insert(list, option.Name)
                 end
             end
             return list
         end
         for _, option in ipairs(options) do
-            if selected[option] then
-                return option
+            if selected[option.Name] then
+                return option.Name
             end
         end
         return nil
@@ -1391,13 +1459,47 @@ function Tab:Dropdown(opts)
     local function renderValueLabel()
         local value = currentValue()
         if multi then
-            fullText = #value > 0 and table.concat(value, ", ") or "None"
+            local count = #value
+            if count > 0 then
+                fullText = table.concat(value, ", ")
+     
+                countBadge.Visible = true
+                countLabel.Text = tostring(count)
+                countBadge.Size = UDim2.fromOffset(countLabel.TextBounds.X + 8, 18)
+                valueLabel.Size = UDim2.new(1, -34 - countBadge.AbsoluteSize.X - 6, 1, 0)
+            else
+                fullText = "None"
+                countBadge.Visible = false
+                valueLabel.Size = UDim2.new(1, -34, 1, 0)
+            end
         else
             fullText = value ~= nil and tostring(value) or "None"
+            countBadge.Visible = false
+            valueLabel.Size = UDim2.new(1, -34, 1, 0)
         end
         valueLabel.Text = trimmed()
-        for option, button in pairs(optionButtons) do
-            local on = selected[option] == true
+
+        local allSelected = true
+        local hasVisible = false
+        for _, option in ipairs(options) do
+            if matches(option) then
+                hasVisible = true
+                if not selected[option.Name] then
+                    allSelected = false
+                    break
+                end
+            end
+        end
+        if hasVisible and allSelected then
+            selectAllCheck.ImageTransparency = 0
+            selectAllCheckScale.Scale = 1
+        else
+            selectAllCheck.ImageTransparency = 1
+            selectAllCheckScale.Scale = 0.6
+        end
+
+        for optionName, button in pairs(optionButtons) do
+            local on = selected[optionName] == true
             if button.On ~= on then
                 button.On = on
                 tween(button.Label, { TextColor3 = on and Theme.Text or Theme.Muted }, 0.15)
@@ -1420,19 +1522,37 @@ function Tab:Dropdown(opts)
     end
 
     local function applyFilter()
-        for option, button in pairs(optionButtons) do
-            button.Frame.Visible = matches(option)
+        for optionName, button in pairs(optionButtons) do
+            local optData = nil
+            for _, o in ipairs(options) do
+                if o.Name == optionName then optData = o break end
+            end
+            if optData then
+                button.Frame.Visible = matches(optData)
+            end
         end
     end
 
     local function expandedHeight()
-        local rows = visibleCount() + (searchHolder.Visible and 1 or 0)
+        local rows = visibleCount()
+        if searchHolder.Visible then rows = rows + 1 end
+        if selectAllHolder.Visible then rows = rows + 1 end
         return height + rows * (DROPDOWN_OPTION_HEIGHT + 4) + 8
     end
 
     local function setOpen(open)
         self_.Open = open
         searchHolder.Visible = #options > SEARCH_THRESHOLD
+        selectAllHolder.Visible = multi and #options > 0
+ 
+        local order = 1
+        if searchHolder.Visible then searchHolder.LayoutOrder = order; order = order + 1 end
+        if selectAllHolder.Visible then selectAllHolder.LayoutOrder = order; order = order + 1 end
+        for _, option in ipairs(options) do
+            local btn = optionButtons[option.Name]
+            if btn then btn.Frame.LayoutOrder = order; order = order + 1 end
+        end
+
         if not open then
             filter = ""
             searchBox.Text = ""
@@ -1442,8 +1562,13 @@ function Tab:Dropdown(opts)
         tween(searchHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
         tween(searchStroke, { Transparency = open and 0 or 1 }, 0.2)
         tween(searchBox, { TextTransparency = open and 0 or 1 }, 0.2)
+        tween(selectAllHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
+        tween(selectAllStroke, { Transparency = open and 0 or 1 }, 0.2)
+        tween(selectAllLabel, { TextTransparency = open and 0 or 1 }, 0.2)
+        tween(selectAllCheck, { ImageTransparency = (open and selectAllCheck.ImageTransparency == 0) and 0 or 1 }, 0.2)
         arrow:Set(open)
         tween(chipStroke, { Color = open and Theme.StrokeHover or Theme.Stroke }, 0.2)
+        
         local function show(button)
             if not button.Stroke then
                 button.Stroke = stroke(button.Frame, Theme.Stroke, 1)
@@ -1461,13 +1586,11 @@ function Tab:Dropdown(opts)
             task.spawn(function()
                 local first = true
                 for _, option in ipairs(options) do
-                    local button = optionButtons[option]
+                    local button = optionButtons[option.Name]
                     if button and button.Frame.Visible then
                         if not first then
                             task.wait(0.025)
-                            if self_._openGeneration ~= generation or not self_.Open then
-                                return
-                            end
+                            if self_._openGeneration ~= generation or not self_.Open then return end
                         end
                         first = false
                         show(button)
@@ -1479,19 +1602,15 @@ function Tab:Dropdown(opts)
             self_._openGeneration = generation
             local visible = {}
             for _, option in ipairs(options) do
-                local button = optionButtons[option]
-                if button and button.Frame.Visible then
-                    table.insert(visible, button)
-                end
+                local button = optionButtons[option.Name]
+                if button and button.Frame.Visible then table.insert(visible, button) end
             end
             task.spawn(function()
                 for index = #visible, 1, -1 do
                     show(visible[index])
                     if index > 1 then
                         task.wait(0.015)
-                        if self_._openGeneration ~= generation or self_.Open then
-                            return
-                        end
+                        if self_._openGeneration ~= generation or self_.Open then return end
                     end
                 end
             end)
@@ -1500,19 +1619,17 @@ function Tab:Dropdown(opts)
 
     local function buildOptions()
         local keep = {}
-        for index, option in ipairs(options) do
-            keep[option] = index
-        end
-        for option, button in pairs(optionButtons) do
-            if not keep[option] then
+        for index, option in ipairs(options) do keep[option.Name] = index end
+        for optionName, button in pairs(optionButtons) do
+            if not keep[optionName] then
                 button.Frame:Destroy()
-                optionButtons[option] = nil
+                optionButtons[optionName] = nil
             end
         end
         for index, option in ipairs(options) do
-            local existing = optionButtons[option]
+            local existing = optionButtons[option.Name]
             if existing then
-                existing.Frame.LayoutOrder = index
+                existing.Frame.LayoutOrder = index + 2
                 continue
             end
             local button = create("TextButton", {
@@ -1521,10 +1638,26 @@ function Tab:Dropdown(opts)
                 BackgroundTransparency = 1,
                 Text = "",
                 AutoButtonColor = false,
-                LayoutOrder = index,
+                LayoutOrder = index + 2,
                 Parent = listHolder,
             })
             corner(button, UDim.new(0, 6))
+            
+            local iconImage = nil
+            if option.Icon then
+                iconImage = create("ImageLabel", {
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Position = UDim2.new(0, 10, 0.5, 0),
+                    Size = UDim2.fromOffset(16, 16),
+                    BackgroundTransparency = 1,
+                    ImageColor3 = Theme.Muted, 
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = button,
+                })
+                applyIcon(iconImage, option.Icon)
+            end
+
+            local textOffset = option.Icon and 34 or 12
             local check = create("ImageLabel", {
                 AnchorPoint = Vector2.new(1, 0.5),
                 Position = UDim2.new(1, -10, 0.5, 0),
@@ -1538,50 +1671,72 @@ function Tab:Dropdown(opts)
             applyIcon(check, "check")
             local checkScale = create("UIScale", { Scale = 0.6, Parent = check })
             local text_ = label({
-                Position = UDim2.fromOffset(12, -1),
-                Size = UDim2.new(1, -36, 1, 0),
-                Text = tostring(option),
+                Position = UDim2.fromOffset(textOffset, -1),
+                Size = UDim2.new(1, -(textOffset + 24), 1, 0),
+                Text = option.Name,
                 TextSize = 13,
                 TextColor3 = Theme.Muted,
                 TextTransparency = 1,
                 Parent = button,
             })
+            
             button.MouseEnter:Connect(function()
                 tween(text_, { TextColor3 = Theme.Text }, 0.15)
-                local entry = optionButtons[option]
-                if entry and entry.Stroke then
-                    tween(entry.Stroke, { Color = Theme.StrokeHover }, 0.12)
-                end
+                if iconImage then tween(iconImage, { ImageColor3 = Theme.Text }, 0.15) end
+                local entry = optionButtons[option.Name]
+                if entry and entry.Stroke then tween(entry.Stroke, { Color = Theme.StrokeHover }, 0.12) end
             end)
             button.MouseLeave:Connect(function()
-                tween(text_, { TextColor3 = selected[option] and Theme.Text or Theme.Muted }, 0.2)
-                local entry = optionButtons[option]
-                if entry and entry.Stroke then
-                    tween(entry.Stroke, { Color = Theme.Stroke }, 0.2)
-                end
+                local isOn = selected[option.Name]
+                tween(text_, { TextColor3 = isOn and Theme.Text or Theme.Muted }, 0.2)
+                if iconImage then tween(iconImage, { ImageColor3 = isOn and Theme.Text or Theme.Muted }, 0.2) end
+                local entry = optionButtons[option.Name]
+                if entry and entry.Stroke then tween(entry.Stroke, { Color = Theme.Stroke }, 0.2) end
             end)
             button.MouseButton1Click:Connect(function()
-                if selected[option] then
-                    selected[option] = nil
+                if selected[option.Name] then
+                    selected[option.Name] = nil
                 else
-                    if not multi then
-                        selected = {}
-                    end
-                    selected[option] = true
+                    if not multi then selected = {} end
+                    selected[option.Name] = true
                 end
                 renderValueLabel()
                 safeCall(opts.Callback, currentValue())
-                if not multi and selected[option] then
-                    setOpen(false)
-                end
+                if not multi and selected[option.Name] then setOpen(false) end
             end)
-            optionButtons[option] = { Frame = button, Label = text_, Check = check, CheckScale = checkScale, Stroke = nil, On = nil }
+            optionButtons[option.Name] = { Frame = button, Label = text_, Check = check, CheckScale = checkScale, Stroke = nil, On = nil, Icon = iconImage }
         end
         applyFilter()
-        if self_.Open then
-            frame.Size = UDim2.new(1, 0, 0, expandedHeight())
-        end
+        if self_.Open then frame.Size = UDim2.new(1, 0, 0, expandedHeight()) end
     end
+
+    selectAllHolder.MouseButton1Click:Connect(function()
+        local allSelected = true
+        for _, option in ipairs(options) do
+            if matches(option) and not selected[option.Name] then
+                allSelected = false break
+            end
+        end
+        for _, option in ipairs(options) do
+            if matches(option) then
+                if allSelected then
+                    selected[option.Name] = nil
+                else
+                    selected[option.Name] = true
+                end
+            end
+        end
+        renderValueLabel()
+        safeCall(opts.Callback, currentValue())
+    end)
+    selectAllHolder.MouseEnter:Connect(function()
+        tween(selectAllLabel, { TextColor3 = Theme.Text }, 0.15)
+        tween(selectAllStroke, { Color = Theme.StrokeHover }, 0.12)
+    end)
+    selectAllHolder.MouseLeave:Connect(function()
+        tween(selectAllLabel, { TextColor3 = Theme.Muted }, 0.2)
+        tween(selectAllStroke, { Color = Theme.Stroke }, 0.2)
+    end)
 
     function self_:Set(value, silent)
         selected = {}
@@ -1594,40 +1749,32 @@ function Tab:Dropdown(opts)
         end
         renderValueLabel()
         flashStroke(frameStroke)
-        if not silent then
-            safeCall(opts.Callback, currentValue())
-        end
+        if not silent then safeCall(opts.Callback, currentValue()) end
     end
 
-    function self_:Get()
-        return currentValue()
-    end
-
+    function self_:Get() return currentValue() end
     function self_:Refresh(newOptions, keepSelection)
-        options = newOptions or {}
-        if not keepSelection then
-            selected = {}
+        rawOptions = newOptions or {}
+        options = {}
+        for _, v in ipairs(rawOptions) do
+            if type(v) == "table" then
+                table.insert(options, { Name = v.Name or v.Title or "Option", Icon = v.Icon })
+            else
+                table.insert(options, { Name = tostring(v), Icon = nil })
+            end
         end
+        if not keepSelection then selected = {} end
         buildOptions()
         renderValueLabel()
-        if self_.Open then
-            setOpen(true)
-        end
+        if self_.Open then setOpen(true) end
     end
+    function self_:SetOpen(open) setOpen(open == true) end
 
-    function self_:SetOpen(open)
-        setOpen(open == true)
-    end
-
-    header.MouseButton1Click:Connect(function()
-        setOpen(not self_.Open)
-    end)
+    header.MouseButton1Click:Connect(function() setOpen(not self_.Open) end)
     searchBox:GetPropertyChangedSignal("Text"):Connect(function()
         filter = string.lower(searchBox.Text)
         applyFilter()
-        if self_.Open then
-            tween(frame, { Size = UDim2.new(1, 0, 0, expandedHeight()) }, 0.2, Enum.EasingStyle.Quint)
-        end
+        if self_.Open then tween(frame, { Size = UDim2.new(1, 0, 0, expandedHeight()) }, 0.2, Enum.EasingStyle.Quint) end
     end)
     buildOptions()
     renderValueLabel()
