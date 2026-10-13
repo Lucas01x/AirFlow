@@ -1357,11 +1357,10 @@ function Tab:Dropdown(opts)
 
     local arrow = arrowIndicator(chip, 1, -6)
 
-    local listHolder = create("CanvasGroup", {
+    local listHolder = create("Frame", {
         Position = UDim2.new(0, 10, 0, height + 2),
         Size = UDim2.new(1, -20, 0, 0),
         BackgroundTransparency = 1,
-        GroupTransparency = 1,
         Visible = false,
         Parent = frame,
     })
@@ -1460,6 +1459,15 @@ function Tab:Dropdown(opts)
     applyIcon(selectAllCheck, "check")
     local selectAllCheckScale = create("UIScale", { Scale = 0.6, Parent = selectAllCheck })
 
+    local divider = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Theme.Stroke,
+        BorderSizePixel = 0,
+        LayoutOrder = 3,
+        Visible = false,
+        Parent = listHolder,
+    })
+
     local optionsScroll = create("ScrollingFrame", {
         Size = UDim2.new(1, 0, 0, ROW),
         BackgroundTransparency = 1,
@@ -1469,7 +1477,7 @@ function Tab:Dropdown(opts)
         ScrollBarImageTransparency = 0.5,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(),
-        LayoutOrder = 3,
+        LayoutOrder = 4,
         Parent = listHolder,
     })
     create("UIListLayout", {
@@ -1546,6 +1554,7 @@ function Tab:Dropdown(opts)
         local showAll = multi and #options > 0
         searchRow.Visible = showSearch
         selectAllRow.Visible = showAll
+        divider.Visible = showAll or showSearch
 
         local scrollH = optionsHeight()
         optionsScroll.Size = UDim2.new(1, 0, 0, scrollH)
@@ -1557,6 +1566,10 @@ function Tab:Dropdown(opts)
         end
         if showAll then
             total += ROW
+            count += 1
+        end
+        if divider.Visible then
+            total += 1
             count += 1
         end
         total += (count - 1) * GAP
@@ -1663,13 +1676,10 @@ function Tab:Dropdown(opts)
         tween(chipStroke, { Color = open and Theme.StrokeHover or Theme.Stroke }, 0.2)
         if open then
             listHolder.Visible = true
-            listHolder.GroupTransparency = 1
             layout(0.3)
-            tween(listHolder, { GroupTransparency = 0 }, 0.25)
         else
             searchBox.Text = ""
             tween(frame, { Size = UDim2.new(1, 0, 0, height) }, 0.3, Enum.EasingStyle.Quint)
-            tween(listHolder, { GroupTransparency = 1 }, 0.15)
             task.delay(0.3, function()
                 if self_._token == token and not self_.Open then
                     listHolder.Visible = false
