@@ -1288,7 +1288,7 @@ function Tab:Dropdown(opts)
 
     local countBadge = create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -6, 0.5, 0),
+        Position = UDim2.new(1, -30, 0.5, 0),
         Size = UDim2.fromOffset(0, 18),
         BackgroundColor3 = Theme.Accent,
         BorderSizePixel = 0,
@@ -1377,9 +1377,18 @@ function Tab:Dropdown(opts)
     })
     corner(searchHolder, UDim.new(0, 6))
     local searchStroke = stroke(searchHolder, Theme.Stroke, 1)
-    local searchBox = create("TextBox", {
+    local searchIcon = create("ImageLabel", {
         Position = UDim2.fromOffset(12, 0),
-        Size = UDim2.new(1, -20, 1, 0),
+        Size = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = searchHolder,
+    })
+    applyIcon(searchIcon, "lucide:search")
+    local searchBox = create("TextBox", {
+        Position = UDim2.fromOffset(36, 0),
+        Size = UDim2.new(1, -48, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
         PlaceholderText = "Search...",
@@ -1392,6 +1401,7 @@ function Tab:Dropdown(opts)
         TextTransparency = 1,
         Parent = searchHolder,
     })
+
 
     local selectAllHolder = create("TextButton", {
         Size = UDim2.new(1, 0, 0, DROPDOWN_OPTION_HEIGHT),
@@ -1406,9 +1416,18 @@ function Tab:Dropdown(opts)
     })
     corner(selectAllHolder, UDim.new(0, 6))
     local selectAllStroke = stroke(selectAllHolder, Theme.Stroke, 1)
-    local selectAllLabel = label({
+    local selectAllIcon = create("ImageLabel", {
         Position = UDim2.fromOffset(12, 0),
-        Size = UDim2.new(1, -20, 1, 0),
+        Size = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Muted,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = selectAllHolder,
+    })
+    applyIcon(selectAllIcon, "lucide:list")
+    local selectAllLabel = label({
+        Position = UDim2.fromOffset(36, 0),
+        Size = UDim2.new(1, -48, 1, 0),
         Text = "Select all",
         TextSize = 13,
         TextColor3 = Theme.Muted,
@@ -1467,6 +1486,7 @@ function Tab:Dropdown(opts)
                 countBadge.Visible = true
                 countLabel.Text = tostring(count)
                 countBadge.Size = UDim2.fromOffset(countLabel.TextBounds.X + 8, 18)
+
                 valueLabel.Size = UDim2.new(1, -34 - countBadge.AbsoluteSize.X - 6, 1, 0)
             else
                 fullText = "None"
@@ -1563,9 +1583,11 @@ function Tab:Dropdown(opts)
         tween(searchHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
         tween(searchStroke, { Transparency = open and 0 or 1 }, 0.2)
         tween(searchBox, { TextTransparency = open and 0 or 1 }, 0.2)
+        tween(searchIcon, { ImageTransparency = open and 0 or 1 }, 0.2)
         tween(selectAllHolder, { BackgroundTransparency = open and 0 or 1 }, 0.2)
         tween(selectAllStroke, { Transparency = open and 0 or 1 }, 0.2)
         tween(selectAllLabel, { TextTransparency = open and 0 or 1 }, 0.2)
+        tween(selectAllIcon, { ImageTransparency = open and 0 or 1 }, 0.2)
         tween(selectAllCheck, { ImageTransparency = (open and selectAllCheck.ImageTransparency == 0) and 0 or 1 }, 0.2)
         arrow:Set(open)
         tween(chipStroke, { Color = open and Theme.StrokeHover or Theme.Stroke }, 0.2)
@@ -1732,10 +1754,12 @@ function Tab:Dropdown(opts)
     end)
     selectAllHolder.MouseEnter:Connect(function()
         tween(selectAllLabel, { TextColor3 = Theme.Text }, 0.15)
+        tween(selectAllIcon, { ImageColor3 = Theme.Text }, 0.15)
         tween(selectAllStroke, { Color = Theme.StrokeHover }, 0.12)
     end)
     selectAllHolder.MouseLeave:Connect(function()
         tween(selectAllLabel, { TextColor3 = Theme.Muted }, 0.2)
+        tween(selectAllIcon, { ImageColor3 = Theme.Muted }, 0.2)
         tween(selectAllStroke, { Color = Theme.Stroke }, 0.2)
     end)
 
