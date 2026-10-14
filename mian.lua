@@ -3009,11 +3009,12 @@ function Library.Window(_, opts)
 
     local dotsHolder = create("Frame", {
         Name = "TrafficLights",
-        Position = UDim2.fromOffset(16, 12),
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -16, 0, 14),
         Size = UDim2.fromOffset(60, 14),
         BackgroundTransparency = 1,
         ZIndex = 6,
-        Parent = body,
+        Parent = content,
     })
     create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
