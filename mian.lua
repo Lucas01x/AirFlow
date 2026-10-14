@@ -2993,15 +2993,23 @@ function Library.Window(_, opts)
         Parent = body,
     })
 
+        local logoSize = opts.IconSize or 30
+    if typeof(logoSize) == "number" then
+        logoSize = Vector2.new(logoSize, logoSize)
+    end
+    local headerHeight = math.max(HEADER_HEIGHT, logoSize.Y + 40)
+    local headerCenter = headerHeight / 2 + 5
+    local titleX = 22 + logoSize.X + 8
+
     local header = create("Frame", {
         Name = "Header",
-        Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
+        Size = UDim2.new(1, 0, 0, headerHeight),
         BackgroundTransparency = 1,
         Parent = sidebar,
     })
     local logo = create("ImageLabel", {
-        Position = UDim2.fromOffset(22, 27),
-        Size = UDim2.fromOffset(30, 28),
+        Position = UDim2.fromOffset(22, headerCenter - logoSize.Y / 2),
+        Size = UDim2.fromOffset(logoSize.X, logoSize.Y),
         BackgroundTransparency = 1,
         Image = "",
         ImageColor3 = Theme.Accent,
@@ -3010,15 +3018,15 @@ function Library.Window(_, opts)
     })
     applyIcon(logo, opts.Icon or Assets.Logo)
     label({
-        Position = UDim2.fromOffset(60, 25),
-        Size = UDim2.new(1, -70, 0, 20),
+        Position = UDim2.fromOffset(titleX, headerCenter - 16),
+        Size = UDim2.new(1, -(titleX + 10), 0, 20),
         Text = opts.Title or "Airflow",
         TextSize = 20,
         Parent = header,
     })
     label({
-        Position = UDim2.fromOffset(60, 45),
-        Size = UDim2.new(1, -70, 0, 14),
+        Position = UDim2.fromOffset(titleX, headerCenter + 4),
+        Size = UDim2.new(1, -(titleX + 10), 0, 14),
         Text = opts.Subtitle or "",
         TextSize = 13,
         FontFace = Fonts.Regular,
@@ -3028,8 +3036,8 @@ function Library.Window(_, opts)
 
     local tabList = create("ScrollingFrame", {
         Name = "Tabs",
-        Position = UDim2.fromOffset(0, HEADER_HEIGHT + 8),
-        Size = UDim2.new(1, 0, 1, -(HEADER_HEIGHT + 8 + 36)),
+        Position = UDim2.fromOffset(0, headerHeight + 8),
+        Size = UDim2.new(1, 0, 1, -(headerHeight + 8 + 36)),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ScrollBarThickness = 0,
@@ -3037,6 +3045,7 @@ function Library.Window(_, opts)
         CanvasSize = UDim2.new(),
         Parent = sidebar,
     })
+    
     self.TabList = tabList
     padding(tabList, 16, 16, 4, 4)
     create("UIListLayout", {
@@ -4583,22 +4592,47 @@ function Window:Tab(opts, icon)
     tab._button = button
 
     local hasIcon = opts.Icon ~= nil
+    local textX = 14
     if hasIcon then
-        local iconImage = create("ImageLabel", {
-            AnchorPoint = Vector2.new(0, 0.5),
-            Position = UDim2.new(0, 12, 0.5, 0),
-            Size = UDim2.fromOffset(16, 16),
-            BackgroundTransparency = 1,
-            ImageColor3 = Theme.Muted,
-            ScaleType = Enum.ScaleType.Fit,
-            Parent = button,
-        })
-        applyIcon(iconImage, opts.Icon)
-        tab._icon = iconImage
+        if opts.Color then
+            local box = create("Frame", {
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.new(0, 8, 0.5, 0),
+                Size = UDim2.fromOffset(26, 26),
+                BackgroundColor3 = opts.Color,
+                BorderSizePixel = 0,
+                Parent = button,
+            })
+            corner(box, UDim.new(0, 7))
+            local image = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(16, 16),
+                BackgroundTransparency = 1,
+                ImageColor3 = Color3.new(1, 1, 1),
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = box,
+            })
+            applyIcon(image, opts.Icon)
+            textX = 44
+        else
+            local iconImage = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.new(0, 12, 0.5, 0),
+                Size = UDim2.fromOffset(16, 16),
+                BackgroundTransparency = 1,
+                ImageColor3 = Theme.Muted,
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = button,
+            })
+            applyIcon(iconImage, opts.Icon)
+            tab._icon = iconImage
+            textX = 36
+        end
     end
     tab._label = label({
-        Position = UDim2.fromOffset(hasIcon and 36 or 14, 0),
-        Size = UDim2.new(1, -(hasIcon and 44 or 22), 1, 0),
+        Position = UDim2.fromOffset(textX, 0),
+        Size = UDim2.new(1, -(textX + 8), 1, 0),
         Text = tab.Name,
         TextColor3 = Theme.Muted,
         Parent = button,
