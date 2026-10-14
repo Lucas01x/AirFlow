@@ -8,7 +8,6 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local Library = {}
-
 Library.Flags = {}
 Library.Windows = {}
 
@@ -4427,6 +4426,7 @@ local function statRow(parent, order, icon, title , color)
             iconBadge(card, icon, color, UDim2.new(0, 14, 0, 21), 26)
         else
             glowIcon(card, icon, Theme.Muted, UDim2.new(0, 14, 0, 21))
+        end
     end
     label({
         Position = UDim2.fromOffset(icon and 36 or 14, 12),
@@ -4877,6 +4877,7 @@ function Window:_buildHome(opts)
                         Parent = button,
                     })
                     applyIcon(iconImage, entry.Icon)
+                end
             end
             local text = label({
                 Position = UDim2.fromOffset(iconImage and 20 or 0, 0),
