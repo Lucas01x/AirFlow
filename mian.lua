@@ -439,12 +439,12 @@ local function softTone(color)
     return color:Lerp(Color3.new(0, 0, 0), 0.22)
 end
 
-local function iconBadge(parent, icon, color, position, boxSize, flat)
+local function iconBadge(parent, icon, color, position, boxSize, flat , spread )
     boxSize = boxSize or 26
     local tone = softTone(color)
     local shadow
     if not flat then
-        local spread = 10
+        local spread = spread  or  10
         shadow = create("ImageLabel", {
             AnchorPoint = Vector2.new(0, 0.5),
             Position = position + UDim2.fromOffset(-spread, 2),
@@ -911,13 +911,13 @@ function Tab:Button(opts)
 
         local chipHeight = CHIP_HEIGHT + 4
         local chipShadow = create("ImageLabel", {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -10, 0.5, 2),
-            Size = UDim2.fromOffset(94, chipHeight + 24),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(1, -10 - 35, 0.5, 3),
+            Size = UDim2.fromOffset(70 + 24, chipHeight + 24),
             BackgroundTransparency = 1,
             Image = Assets.Shadow,
             ImageColor3 = actionColor,
-            ImageTransparency = 0.65,
+            ImageTransparency = 0.72,
             ScaleType = Enum.ScaleType.Slice,
             SliceCenter = Rect.new(49, 49, 450, 450),
             ZIndex = 0,
@@ -936,9 +936,9 @@ function Tab:Button(opts)
         })
         corner(chip, UDim.new(0, 7))
         stroke(chip, actionColor:Lerp(Color3.new(1, 1, 1), 0.2), 0.65)
-        chip:GetPropertyChangedSignal("Size"):Connect(function()
-            chipShadow.Size = UDim2.fromOffset(chip.Size.X.Offset + 24, chipHeight + 24)
-        end)
+        -- chip:GetPropertyChangedSignal("Size"):Connect(function()
+        --     chipShadow.Size = UDim2.fromOffset(chip.Size.X.Offset + 24, chipHeight + 24)
+        -- end)
         if opts.Icon then
             glowIcon(chip, opts.Icon, Color3.new(1, 1, 1), UDim2.new(0, 10, 0.5, 0))
         end
@@ -958,6 +958,8 @@ function Tab:Button(opts)
             local extra = opts.Icon and 44 or 24
             local width = math.max(chipText.TextBounds.X + extra, 64)
             chip.Size = UDim2.fromOffset(width, chipHeight)
+            chipShadow.Size = UDim2.fromOffset(width + 24, chipHeight + 24)
+            chipShadow.Position = UDim2.new(1, -10 - width / 2, 0.5, 3)
             reserveRight(title, descLabel, width + 20)
         end
         chipText:GetPropertyChangedSignal("TextBounds"):Connect(fit)
@@ -4953,7 +4955,7 @@ function Window:Tab(opts, icon)
             -- })
             -- applyIcon(image, opts.Icon)
             -- textX = 44
-            iconBadge(button, opts.Icon, opts.Color, UDim2.new(0, 8, 0.5, 0), 26)
+            iconBadge(button, opts.Icon, opts.Color, UDim2.new(0, 8, 0.5, 0), 26, false, 4)
             textX = 44
         else
             local iconImage = create("ImageLabel", {
