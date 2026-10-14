@@ -3007,31 +3007,116 @@ function Library.Window(_, opts)
         Parent = content,
     })
 
-    local closeButton = create("TextButton", {
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -14, 0, 14),
-        Size = UDim2.fromOffset(34, 34),
-        BackgroundColor3 = Theme.Surface2,
+    local dotsHolder = create("Frame", {
+        Name = "TrafficLights",
+        Position = UDim2.fromOffset(16, 12),
+        Size = UDim2.fromOffset(60, 14),
         BackgroundTransparency = 1,
-        Text = "×",
-        TextColor3 = Theme.Muted,
-        TextSize = 28,
-        FontFace = Fonts.Bold,
-        AutoButtonColor = false,
-        ZIndex = 5,
-        Parent = content,
+        ZIndex = 6,
+        Parent = body,
     })
-    padding(closeButton, 0, 0, 1, 0)
-    corner(closeButton, UDim.new(0, 8))
-    closeButton.MouseEnter:Connect(function()
-        tween(closeButton, { BackgroundTransparency = 0, TextColor3 = Theme.Text }, 0.15)
+    create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+        Parent = dotsHolder,
+    })
+
+    local dotGlyphs = {}
+    local function trafficDot(order, color, glyph, onClick)
+        local dot = create("TextButton", {
+            Size = UDim2.fromOffset(12, 12),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            LayoutOrder = order,
+            ZIndex = 7,
+            Parent = dotsHolder,
+        })
+        corner(dot, UDim.new(1, 0))
+        local mark = label({
+            Size = UDim2.fromScale(1, 1),
+            Text = glyph,
+            TextSize = 12,
+            FontFace = Fonts.Bold,
+            TextColor3 = Color3.fromRGB(60, 20, 20),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextTruncate = Enum.TextTruncate.None,
+            TextTransparency = 1,
+            ZIndex = 8,
+            Parent = dot,
+        })
+        table.insert(dotGlyphs, mark)
+        dot.MouseEnter:Connect(function()
+            for _, g in ipairs(dotGlyphs) do
+                tween(g, { TextTransparency = 0.15 }, 0.1)
+            end
+        end)
+        dot.MouseLeave:Connect(function()
+            for _, g in ipairs(dotGlyphs) do
+                tween(g, { TextTransparency = 1 }, 0.15)
+            end
+        end)
+        dot.MouseButton1Click:Connect(onClick)
+        return dot
+    end
+
+    trafficDot(1, Color3.fromRGB(255, 95, 87), "×", function()
+        self:Destroy()
     end)
-    closeButton.MouseLeave:Connect(function()
-        tween(closeButton, { BackgroundTransparency = 1, TextColor3 = Theme.Muted }, 0.2)
-    end)
-    closeButton.MouseButton1Click:Connect(function()
+    trafficDot(2, Color3.fromRGB(254, 188, 46), "−", function()
+        if not self.OpenButton then
+            self:_createOpenButton({ Icon = opts.Icon, Title = opts.Title })
+        end
         self:Toggle(false)
     end)
+
+    local maximized = false
+    local restoreSize, restorePos
+    trafficDot(3, Color3.fromRGB(40, 200, 64), "+", function()
+        local viewport = gui.AbsoluteSize
+        if not maximized then
+            maximized = true
+            restoreSize = root.Size
+            restorePos = root.Position
+            local s = math.max(scale.Scale, 0.01)
+            tween(root, {
+                Size = UDim2.fromOffset((viewport.X - 48) / s, (viewport.Y - 48) / s),
+                Position = UDim2.fromScale(0.5, 0.5),
+            }, 0.35, Enum.EasingStyle.Quint)
+        else
+            maximized = false
+            tween(root, { Size = restoreSize, Position = restorePos }, 0.35, Enum.EasingStyle.Quint)
+        end
+    end)
+    
+    -- local closeButton = create("TextButton", {
+    --     AnchorPoint = Vector2.new(1, 0),
+    --     Position = UDim2.new(1, -14, 0, 14),
+    --     Size = UDim2.fromOffset(34, 34),
+    --     BackgroundColor3 = Theme.Surface2,
+    --     BackgroundTransparency = 1,
+    --     Text = "×",
+    --     TextColor3 = Theme.Muted,
+    --     TextSize = 28,
+    --     FontFace = Fonts.Bold,
+    --     AutoButtonColor = false,
+    --     ZIndex = 5,
+    --     Parent = content,
+    -- })
+    -- padding(closeButton, 0, 0, 1, 0)
+    -- corner(closeButton, UDim.new(0, 8))
+    -- closeButton.MouseEnter:Connect(function()
+    --     tween(closeButton, { BackgroundTransparency = 0, TextColor3 = Theme.Text }, 0.15)
+    -- end)
+    -- closeButton.MouseLeave:Connect(function()
+    --     tween(closeButton, { BackgroundTransparency = 1, TextColor3 = Theme.Muted }, 0.2)
+    -- end)
+    -- closeButton.MouseButton1Click:Connect(function()
+    --     self:Toggle(false)
+    -- end)
 
     local notifyHolder = create("Frame", {
         Name = "Notifications",
