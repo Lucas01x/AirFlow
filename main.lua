@@ -3046,8 +3046,8 @@ function Tab:Group(opts)
             -- })
             -- applyIcon(image, opts.Icon)
             -- textX = 38
-            iconBadge(header, opts.Icon, opts.Color or Color3.fromRGB(56, 128, 255), UDim2.new(0, 0, 0, 25), 28)
-            textX = 38
+            iconBadge(header, opts.Icon, opts.Color or Color3.fromRGB(56, 128, 255), UDim2.new(0, 2, 0, 18), 33)
+            textX = 45
         end
         label({
             Position = UDim2.fromOffset(textX, 0),
