@@ -4484,6 +4484,7 @@ function Window:_buildHome(opts)
         Name = opts.Name or "Home",
         Desc = opts.Desc,
         Icon = opts.Icon or "house",
+        Color = opts.Color,
     })
     local list = tab.List
 
