@@ -435,24 +435,51 @@ local function glowIcon(parent, icon, color, position)
     return holder, image
 end
 
-local function iconBadge(parent, icon, color, position, boxSize)
+local function softTone(color)
+    return color:Lerp(Color3.new(0, 0, 0), 0.22)
+end
+
+local function iconBadge(parent, icon, color, position, boxSize, flat)
     boxSize = boxSize or 26
+    local tone = softTone(color)
+    local shadow
+    if not flat then
+        local spread = 10
+        shadow = create("ImageLabel", {
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = position + UDim2.fromOffset(-spread, 2),
+            Size = UDim2.fromOffset(boxSize + spread * 2, boxSize + spread * 2),
+            BackgroundTransparency = 1,
+            Image = Assets.Shadow,
+            ImageColor3 = tone,
+            ImageTransparency = 0.7,
+            ScaleType = Enum.ScaleType.Slice,
+            SliceCenter = Rect.new(49, 49, 450, 450),
+            ZIndex = 0,
+            Parent = parent,
+        })
+    end
     local box = create("Frame", {
         AnchorPoint = Vector2.new(0, 0.5),
         Position = position,
         Size = UDim2.fromOffset(boxSize, boxSize),
-        BackgroundColor3 = color,
+        BackgroundColor3 = tone,
         BorderSizePixel = 0,
         Parent = parent,
     })
     corner(box, UDim.new(0, math.floor(boxSize * 0.27)))
+    if shadow then
+        box.Destroying:Connect(function()
+            shadow:Destroy()
+        end)
+    end
     local glyph = math.floor(boxSize * 0.62)
     local image = create("ImageLabel", {
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(glyph, glyph),
         BackgroundTransparency = 1,
-        ImageColor3 = Color3.new(1, 1, 1),
+        ImageColor3 = Color3.fromRGB(240, 240, 240),
         ScaleType = Enum.ScaleType.Fit,
         Parent = box,
     })
@@ -764,6 +791,9 @@ function Tab:Section(text)
 end
 
 function Tab:Divider()
+    if self._grouped then
+        return finishElement(self, {}, {}, nil, "Divider")
+    end
     local line = create("Frame", {
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Theme.Stroke,
@@ -874,12 +904,25 @@ function Tab:Button(opts)
     opts = normalize(opts, { Title = "Name", Description = "Desc" })
 
     if opts.Style == "Action" then
-        local actionColor = opts.Color or Color3.fromRGB(88, 101, 242)
-        local hoverColor = actionColor:Lerp(Color3.new(1, 1, 1), 0.15)
+                local actionColor = softTone(opts.Color or Color3.fromRGB(88, 101, 242))
+        local hoverColor = actionColor:Lerp(Color3.new(1, 1, 1), 0.1)
         local frame, frameStroke, _, title, descLabel
         opts, frame, frameStroke, _, title, descLabel = beginElement(self, opts, {}, "Frame", 110, "Button")
 
         local chipHeight = CHIP_HEIGHT + 4
+        local chipShadow = create("ImageLabel", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -10, 0.5, 2),
+            Size = UDim2.fromOffset(94, chipHeight + 24),
+            BackgroundTransparency = 1,
+            Image = Assets.Shadow,
+            ImageColor3 = actionColor,
+            ImageTransparency = 0.65,
+            ScaleType = Enum.ScaleType.Slice,
+            SliceCenter = Rect.new(49, 49, 450, 450),
+            ZIndex = 0,
+            Parent = frame,
+        })
         local chip = create("TextButton", {
             AnchorPoint = Vector2.new(1, 0.5),
             Position = UDim2.new(1, -10, 0.5, 0),
@@ -892,6 +935,10 @@ function Tab:Button(opts)
             Parent = frame,
         })
         corner(chip, UDim.new(0, 7))
+        stroke(chip, actionColor:Lerp(Color3.new(1, 1, 1), 0.2), 0.65)
+        chip:GetPropertyChangedSignal("Size"):Connect(function()
+            chipShadow.Size = UDim2.fromOffset(chip.Size.X.Offset + 24, chipHeight + 24)
+        end)
         if opts.Icon then
             glowIcon(chip, opts.Icon, Color3.new(1, 1, 1), UDim2.new(0, 10, 0.5, 0))
         end
@@ -1921,6 +1968,8 @@ function Tab:Dropdown(opts)
             elseif option.Icon and option.Color and not isRawImage(option.Icon) then
                 raw = true
                 iconImage = iconBadge(row, option.Icon, option.Color, UDim2.new(0, 10, 0.5, 0), 22)
+            elseif option.Icon then
+                raw = isRawImage(option.Icon)
                 local size = raw and 22 or 16
                 iconImage = create("ImageLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -2978,23 +3027,25 @@ function Tab:Group(opts)
         })
         local textX = 0
         if opts.Icon then
-            local box = create("Frame", {
-                Size = UDim2.fromOffset(28, 28),
-                BackgroundColor3 = opts.Color or Color3.fromRGB(56, 128, 255),
-                BorderSizePixel = 0,
-                Parent = header,
-            })
-            corner(box, UDim.new(0, 7))
-            local image = create("ImageLabel", {
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(16, 16),
-                BackgroundTransparency = 1,
-                ImageColor3 = Color3.new(1, 1, 1),
-                ScaleType = Enum.ScaleType.Fit,
-                Parent = box,
-            })
-            applyIcon(image, opts.Icon)
+            -- local box = create("Frame", {
+            --     Size = UDim2.fromOffset(28, 28),
+            --     BackgroundColor3 = opts.Color or Color3.fromRGB(56, 128, 255),
+            --     BorderSizePixel = 0,
+            --     Parent = header,
+            -- })
+            -- corner(box, UDim.new(0, 7))
+            -- local image = create("ImageLabel", {
+            --     AnchorPoint = Vector2.new(0.5, 0.5),
+            --     Position = UDim2.fromScale(0.5, 0.5),
+            --     Size = UDim2.fromOffset(16, 16),
+            --     BackgroundTransparency = 1,
+            --     ImageColor3 = Color3.new(1, 1, 1),
+            --     ScaleType = Enum.ScaleType.Fit,
+            --     Parent = box,
+            -- })
+            -- applyIcon(image, opts.Icon)
+            -- textX = 38
+            iconBadge(header, opts.Icon, opts.Color or Color3.fromRGB(56, 128, 255), UDim2.new(0, 0, 0, 14), 28)
             textX = 38
         end
         label({
@@ -4882,25 +4933,27 @@ function Window:Tab(opts, icon)
     local textX = 14
     if hasIcon then
         if opts.Color then
-            local box = create("Frame", {
-                AnchorPoint = Vector2.new(0, 0.5),
-                Position = UDim2.new(0, 8, 0.5, 0),
-                Size = UDim2.fromOffset(26, 26),
-                BackgroundColor3 = opts.Color,
-                BorderSizePixel = 0,
-                Parent = button,
-            })
-            corner(box, UDim.new(0, 7))
-            local image = create("ImageLabel", {
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Position = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(16, 16),
-                BackgroundTransparency = 1,
-                ImageColor3 = Color3.new(1, 1, 1),
-                ScaleType = Enum.ScaleType.Fit,
-                Parent = box,
-            })
-            applyIcon(image, opts.Icon)
+            -- local box = create("Frame", {
+            --     AnchorPoint = Vector2.new(0, 0.5),
+            --     Position = UDim2.new(0, 8, 0.5, 0),
+            --     Size = UDim2.fromOffset(26, 26),
+            --     BackgroundColor3 = opts.Color,
+            --     BorderSizePixel = 0,
+            --     Parent = button,
+            -- })
+            -- corner(box, UDim.new(0, 7))
+            -- local image = create("ImageLabel", {
+            --     AnchorPoint = Vector2.new(0.5, 0.5),
+            --     Position = UDim2.fromScale(0.5, 0.5),
+            --     Size = UDim2.fromOffset(16, 16),
+            --     BackgroundTransparency = 1,
+            --     ImageColor3 = Color3.new(1, 1, 1),
+            --     ScaleType = Enum.ScaleType.Fit,
+            --     Parent = box,
+            -- })
+            -- applyIcon(image, opts.Icon)
+            -- textX = 44
+            iconBadge(button, opts.Icon, opts.Color, UDim2.new(0, 8, 0.5, 0), 26)
             textX = 44
         else
             local iconImage = create("ImageLabel", {
@@ -5376,7 +5429,7 @@ function Window:Toggle(open)
     if open then
         self.Root.Visible = true
         tween(self.Scale, { Scale = self._fitScale or 1 }, 0.4, Enum.EasingStyle.Back)
-        tween(self.Body, { GroupTransparency = 0 }, 0.25)
+        self:_fadeBody(true, 0.25)
         tween(self.BodyStroke, { Transparency = 0 }, 0.25)
         tween(self.Shadow, { ImageTransparency = 0.6 }, 0.3)
     else
