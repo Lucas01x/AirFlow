@@ -4411,7 +4411,7 @@ local function emptyState(parent, icon, text)
     return holder, caption, image
 end
 
-local function statRow(parent, order, icon, title)
+local function statRow(parent, order, icon, title , color)
     local card = create("Frame", {
         Size = UDim2.new(0.5, -4, 0, 62),
         BackgroundColor3 = Theme.Surface2,
@@ -4423,7 +4423,10 @@ local function statRow(parent, order, icon, title)
     stroke(card)
     card:SetAttribute("NoDrag", true)
     if icon then
-        glowIcon(card, icon, Theme.Muted, UDim2.new(0, 14, 0, 21))
+         if color then
+            iconBadge(card, icon, color, UDim2.new(0, 14, 0, 21), 26)
+        else
+            glowIcon(card, icon, Theme.Muted, UDim2.new(0, 14, 0, 21))
     end
     label({
         Position = UDim2.fromOffset(icon and 36 or 14, 12),
@@ -4861,16 +4864,19 @@ function Window:_buildHome(opts)
             padding(button, 12, 12)
             local iconImage
             if entry.Icon then
-                iconImage = create("ImageLabel", {
-                    AnchorPoint = Vector2.new(0, 0.5),
-                    Position = UDim2.new(0, 0, 0.5, 0),
-                    Size = UDim2.fromOffset(14, 14),
-                    BackgroundTransparency = 1,
-                    ImageColor3 = Theme.Muted,
-                    ScaleType = Enum.ScaleType.Fit,
-                    Parent = button,
-                })
-                applyIcon(iconImage, entry.Icon)
+                 if entry.Color then
+                    iconBadge(button, entry.Icon, entry.Color, UDim2.new(0, 0, 0.5, 0), 20, false, 3)
+                else
+                    iconImage = create("ImageLabel", {
+                        AnchorPoint = Vector2.new(0, 0.5),
+                        Position = UDim2.new(0, 0, 0.5, 0),
+                        Size = UDim2.fromOffset(14, 14),
+                        BackgroundTransparency = 1,
+                        ImageColor3 = Theme.Muted,
+                        ScaleType = Enum.ScaleType.Fit,
+                        Parent = button,
+                    })
+                    applyIcon(iconImage, entry.Icon)
             end
             local text = label({
                 Position = UDim2.fromOffset(iconImage and 20 or 0, 0),
