@@ -435,6 +435,31 @@ local function glowIcon(parent, icon, color, position)
     return holder, image
 end
 
+local function iconBadge(parent, icon, color, position, boxSize)
+    boxSize = boxSize or 26
+    local box = create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = position,
+        Size = UDim2.fromOffset(boxSize, boxSize),
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Parent = parent,
+    })
+    corner(box, UDim.new(0, math.floor(boxSize * 0.27)))
+    local glyph = math.floor(boxSize * 0.62)
+    local image = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(glyph, glyph),
+        BackgroundTransparency = 1,
+        ImageColor3 = Color3.new(1, 1, 1),
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = box,
+    })
+    applyIcon(image, icon)
+    return box, image
+end
+
 local function arrowIndicator(parent, anchorX, offsetX)
     local holder = create("Frame", {
         AnchorPoint = Vector2.new(anchorX, 0.5),
@@ -751,16 +776,31 @@ end
 
 function Tab:Label(opts)
     opts = normalize(opts, { Name = "Text", Title = "Text" })
-    local text_ = label({
-        Size = UDim2.new(1, 0, 0, 18),
-        Text = opts.Text or "",
-        TextSize = 13,
-        FontFace = Fonts.Regular,
-        TextColor3 = opts.Color or Theme.Muted,
-        LayoutOrder = self:_nextOrder(),
-        Parent = self.List,
-    })
-    padding(text_, 2)
+    local holder
+    local text_
+    if self._grouped then
+        holder = card(self, "Frame", 34, opts)
+        text_ = label({
+            Position = UDim2.fromOffset(14, 0),
+            Size = UDim2.new(1, -28, 1, 0),
+            Text = opts.Text or "",
+            TextSize = 13,
+            FontFace = Fonts.Regular,
+            TextColor3 = opts.Color or Theme.Muted,
+            Parent = holder,
+        })
+    else
+        text_ = label({
+            Size = UDim2.new(1, 0, 0, 18),
+            Text = opts.Text or "",
+            TextSize = 13,
+            FontFace = Fonts.Regular,
+            TextColor3 = opts.Color or Theme.Muted,
+            LayoutOrder = self:_nextOrder(),
+            Parent = self.List,
+        })
+        padding(text_, 2)
+    end
     local handle = {
         Set = function(_, value)
             text_.Text = tostring(value)
@@ -791,7 +831,7 @@ function Tab:Label(opts)
             rate = math.max(tonumber(seconds) or rate, 0.05)
         end
     end
-    return finishElement(self, opts, handle, text_, "Label")
+    return finishElement(self, opts, handle, holder or text_, "Label")
 end
 
 function Tab:Paragraph(opts)
@@ -832,6 +872,71 @@ end
 
 function Tab:Button(opts)
     opts = normalize(opts, { Title = "Name", Description = "Desc" })
+
+    if opts.Style == "Action" then
+        local actionColor = opts.Color or Color3.fromRGB(88, 101, 242)
+        local hoverColor = actionColor:Lerp(Color3.new(1, 1, 1), 0.15)
+        local frame, frameStroke, _, title, descLabel
+        opts, frame, frameStroke, _, title, descLabel = beginElement(self, opts, {}, "Frame", 110, "Button")
+
+        local chipHeight = CHIP_HEIGHT + 4
+        local chip = create("TextButton", {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -10, 0.5, 0),
+            Size = UDim2.fromOffset(70, chipHeight),
+            BackgroundColor3 = actionColor,
+            BorderSizePixel = 0,
+            Text = "",
+            AutoButtonColor = false,
+            ClipsDescendants = true,
+            Parent = frame,
+        })
+        corner(chip, UDim.new(0, 7))
+        if opts.Icon then
+            glowIcon(chip, opts.Icon, Color3.new(1, 1, 1), UDim2.new(0, 10, 0.5, 0))
+        end
+        local textStart = opts.Icon and 32 or 0
+        local chipText = label({
+            Position = UDim2.fromOffset(textStart, 0),
+            Size = UDim2.new(1, -textStart, 1, 0),
+            Text = opts.ButtonText or opts.Text or "Run",
+            TextSize = 13,
+            TextColor3 = Color3.new(1, 1, 1),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextTruncate = Enum.TextTruncate.None,
+            Parent = chip,
+        })
+
+        local function fit()
+            local extra = opts.Icon and 44 or 24
+            local width = math.max(chipText.TextBounds.X + extra, 64)
+            chip.Size = UDim2.fromOffset(width, chipHeight)
+            reserveRight(title, descLabel, width + 20)
+        end
+        chipText:GetPropertyChangedSignal("TextBounds"):Connect(fit)
+        task.defer(fit)
+
+        chip.MouseEnter:Connect(function()
+            tween(chip, { BackgroundColor3 = hoverColor }, 0.12)
+        end)
+        chip.MouseLeave:Connect(function()
+            tween(chip, { BackgroundColor3 = actionColor }, 0.2)
+        end)
+        chip.MouseButton1Click:Connect(function()
+            ripple(chip)
+            safeCall(opts.Callback)
+        end)
+
+        return finishElement(self, opts, {
+            SetText = function(_, value)
+                title.Text = value
+            end,
+            SetButtonText = function(_, value)
+                chipText.Text = value
+            end,
+        }, frame, "Button")
+    end
+
     local primary = opts.Style == "Primary"
     local height = opts.Desc and CARD_HEIGHT_DESC or CARD_HEIGHT
     local button, buttonStroke = card(self, "TextButton", height, opts)
@@ -857,8 +962,13 @@ function Tab:Button(opts)
     local textColor = primary and Theme.AccentDark or Theme.Text
     local iconOffset = 0
     if opts.Icon then
-        glowIcon(button, opts.Icon, primary and Theme.AccentDark or Theme.Accent, UDim2.new(0, 14, 0.5, 0))
-        iconOffset = 26
+        if opts.Color then
+            iconBadge(button, opts.Icon, opts.Color, UDim2.new(0, 12, 0.5, 0), 28)
+            iconOffset = 34
+        else
+            glowIcon(button, opts.Icon, primary and Theme.AccentDark or Theme.Accent, UDim2.new(0, 14, 0.5, 0))
+            iconOffset = 26
+        end
     end
     local title = titleDesc(button, opts.Name or "Button", opts.Desc, 30)
     if iconOffset > 0 then
@@ -1286,7 +1396,7 @@ function Tab:Dropdown(opts)
         local list = {}
         for _, v in ipairs(raw) do
             if type(v) == "table" then
-                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model })
+                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model, Color = v.Color })
             else
                 table.insert(list, { Name = tostring(v), Icon = nil })
             end
@@ -1808,8 +1918,9 @@ function Tab:Dropdown(opts)
                 })
                 corner(iconImage, UDim.new(0, 5))
                 buildFace(iconImage, option.Icon)
-            elseif option.Icon then
-                raw = isRawImage(option.Icon)
+            elseif option.Icon and option.Color and not isRawImage(option.Icon) then
+                raw = true
+                iconImage = iconBadge(row, option.Icon, option.Color, UDim2.new(0, 10, 0.5, 0), 22)
                 local size = raw and 22 or 16
                 iconImage = create("ImageLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1981,7 +2092,11 @@ function Tab:Input(opts)
 
     local boxIcon = opts.Icon
     if boxIcon then
-        glowIcon(boxHolder, boxIcon, Theme.Muted, UDim2.new(0, 8, 0.5, 0))
+        if opts.Color then
+            iconBadge(boxHolder, boxIcon, opts.Color, UDim2.new(0, 5, 0.5, 0), 20)
+        else
+            glowIcon(boxHolder, boxIcon, Theme.Muted, UDim2.new(0, 8, 0.5, 0))
+        end
     end
     local box = create("TextBox", {
         Position = UDim2.fromOffset(boxIcon and 30 or 8, 0),
@@ -2645,6 +2760,114 @@ function Tab:Progress(opts)
 end
 
 
+local IMAGE_SCALE = {
+    Fit = Enum.ScaleType.Fit,
+    Crop = Enum.ScaleType.Crop,
+    Stretch = Enum.ScaleType.Stretch,
+}
+
+local function parseImageSize(size)
+    local width, height = nil, 140
+    if type(size) == "number" then
+        height = size
+    elseif typeof(size) == "Vector2" then
+        width, height = size.X, size.Y
+    elseif typeof(size) == "UDim2" then
+        width, height = size.X.Offset, size.Y.Offset
+    end
+    if width and width <= 0 then
+        width = nil
+    end
+    return width, math.max(height, 8)
+end
+
+local function loadRemoteImage(url, callback)
+    if type(writefile) ~= "function" or type(isfile) ~= "function" or typeof(getcustomasset) ~= "function" then
+        return
+    end
+    task.spawn(function()
+        local ok, asset = pcall(function()
+            local folder = "AirFlowImages"
+            if type(isfolder) == "function" and type(makefolder) == "function" and not isfolder(folder) then
+                makefolder(folder)
+            end
+            local path = folder .. "/" .. url:gsub("[^%w]", "_"):sub(-80) .. ".png"
+            if not isfile(path) then
+                writefile(path, game:HttpGet(url))
+            end
+            return getcustomasset(path)
+        end)
+        if ok and asset then
+            callback(asset)
+        end
+    end)
+end
+
+function Tab:Image(opts)
+    opts = normalize(opts, { Source = "Image", Url = "Image", Icon = "Image" })
+    local width, height = parseImageSize(opts.Size or opts.Height)
+    width = opts.Width or width
+    local align = opts.Align or "Center"
+
+    local frame, frameStroke = card(self, "Frame", height + 16, opts)
+    hoverStroke(frame, frameStroke)
+
+    local image = create("ImageLabel", {
+        BackgroundTransparency = 1,
+        ImageColor3 = opts.Tint or Color3.new(1, 1, 1),
+        ScaleType = IMAGE_SCALE[opts.ScaleType or "Fit"] or Enum.ScaleType.Fit,
+        Parent = frame,
+    })
+    corner(image, UDim.new(0, opts.Radius or 6))
+
+    local function layout()
+        frame.Size = UDim2.new(1, 0, 0, height + 16)
+        if width then
+            local anchorX = align == "Left" and 0 or (align == "Right" and 1 or 0.5)
+            local offsetX = align == "Left" and 8 or (align == "Right" and -8 or 0)
+            image.AnchorPoint = Vector2.new(anchorX, 0.5)
+            image.Position = UDim2.new(anchorX, offsetX, 0.5, 0)
+            image.Size = UDim2.fromOffset(width, height)
+        else
+            image.AnchorPoint = Vector2.new(0.5, 0.5)
+            image.Position = UDim2.fromScale(0.5, 0.5)
+            image.Size = UDim2.new(1, -16, 1, -16)
+        end
+    end
+
+    local function setSource(source)
+        if type(source) == "number" then
+            source = "rbxassetid://" .. tostring(source)
+        end
+        if type(source) == "string" and source:find("^http") then
+            loadRemoteImage(source, function(asset)
+                image.Image = asset
+            end)
+        else
+            applyIcon(image, source)
+        end
+    end
+
+    layout()
+    setSource(opts.Image)
+
+    local self_ = {}
+    function self_:Set(source)
+        setSource(source)
+    end
+    function self_:SetSize(size)
+        width, height = parseImageSize(size)
+        layout()
+    end
+    function self_:SetTint(color)
+        image.ImageColor3 = color
+    end
+    function self_:Get()
+        return image.Image
+    end
+    return finishElement(self, opts, self_, frame, "Image")
+end
+
 function Tab:ConfigManager(opts)
     opts = normalize(opts, {})
     local window = self.Window
@@ -2963,11 +3186,12 @@ function Library.Window(_, opts)
     })
     self.Shadow = shadow
 
-    local body = create("CanvasGroup", {
+    local body = create("Frame", {
         Name = "Body",
         Size = UDim2.fromScale(1, 1),
         BackgroundColor3 = Theme.Background,
         BorderSizePixel = 0,
+        ClipsDescendants = true,
         Parent = root,
     })
     self.Body = body
@@ -3328,7 +3552,7 @@ function Library.Window(_, opts)
     gui.Parent = opts.Parent or defaultParent()
 
     scale.Scale = 0.9
-    body.GroupTransparency = 1
+    -- body.GroupTransparency = 1
     shadow.ImageTransparency = 1
     self.BodyStroke.Transparency = 1
     root.Visible = false
@@ -3518,6 +3742,69 @@ function Window:_revealCards(tab, baseDelay)
     end
 end
 
+local function collectFade(root, skip)
+    local parts = {}
+    local function add(object, property)
+        table.insert(parts, { object, property, object[property] })
+    end
+    local function visit(object)
+        if object == skip then
+            return
+        end
+        if object:IsA("GuiObject") then
+            add(object, "BackgroundTransparency")
+            if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+                add(object, "TextTransparency")
+            elseif object:IsA("ImageLabel") or object:IsA("ImageButton") or object:IsA("ViewportFrame") then
+                add(object, "ImageTransparency")
+            elseif object:IsA("ScrollingFrame") then
+                add(object, "ScrollBarImageTransparency")
+            end
+        elseif object:IsA("UIStroke") then
+            add(object, "Transparency")
+        end
+    end
+    visit(root)
+    for _, descendant in ipairs(root:GetDescendants()) do
+        visit(descendant)
+    end
+    return parts
+end
+
+function Window:_fadeBody(show, duration, prepare)
+    local skip = self.BodyStroke
+    if show then
+        local parts = self._fadeParts
+        if prepare or not parts then
+            parts = collectFade(self.Body, skip)
+            self._fadeParts = parts
+            if prepare then
+                for _, part in ipairs(parts) do
+                    part[1][part[2]] = 1
+                end
+            end
+        end
+        for _, part in ipairs(parts) do
+            if part[1].Parent then
+                tween(part[1], { [part[2]] = part[3] }, duration)
+            end
+        end
+        task.delay(duration + 0.05, function()
+            if self._fadeParts == parts and self.Open then
+                self._fadeParts = nil
+            end
+        end)
+    else
+        local parts = self._fadeParts or collectFade(self.Body, skip)
+        self._fadeParts = parts
+        for _, part in ipairs(parts) do
+            if part[1].Parent then
+                tween(part[1], { [part[2]] = 1 }, duration)
+            end
+        end
+    end
+end
+
 function Window:_playIntro(morph)
     if self._introDone then
         return
@@ -3534,14 +3821,14 @@ function Window:_playIntro(morph)
     if morph then
         scale.Scale = self._fitScale or 1
         root.Position = UDim2.fromScale(0.5, 0.5)
-        tween(body, { GroupTransparency = 0 }, 0.3)
+        self:_fadeBody(true, 0.3, true)
         tween(self.BodyStroke, { Transparency = 0 }, 0.3)
         tween(shadow, { ImageTransparency = 0.6 }, 0.3)
     else
         root.Position = UDim2.new(0.5, 0, 0.5, 24)
         tween(scale, { Scale = self._fitScale or 1 }, 0.5, Enum.EasingStyle.Back)
         tween(root, { Position = UDim2.fromScale(0.5, 0.5) }, 0.5, Enum.EasingStyle.Quint)
-        tween(body, { GroupTransparency = 0 }, 0.35)
+        self:_fadeBody(true, 0.35, true)
         tween(self.BodyStroke, { Transparency = 0 }, 0.35)
     end
     if not morph then
@@ -4766,12 +5053,23 @@ function Window:Dialog(opts)
 
     local titleOffset = 0
     if opts.Icon then
-        local holder, image = glowIcon(card, opts.Icon, Theme.Accent, UDim2.new(0, PAD, 0, PAD + 9))
-        image.ImageTransparency = 1
-        holder.ZIndex = 42
-        image.ZIndex = 42
-        table.insert(fading, { image, "ImageTransparency", 0 })
-        titleOffset = 24
+        if opts.Color then
+            local box, image = iconBadge(card, opts.Icon, opts.Color, UDim2.new(0, PAD, 0, PAD + 9), 28)
+            box.BackgroundTransparency = 1
+            image.ImageTransparency = 1
+            box.ZIndex = 42
+            image.ZIndex = 43
+            table.insert(fading, { box, "BackgroundTransparency", 0 })
+            table.insert(fading, { image, "ImageTransparency", 0 })
+            titleOffset = 38
+        else
+            local holder, image = glowIcon(card, opts.Icon, Theme.Accent, UDim2.new(0, PAD, 0, PAD + 9))
+            image.ImageTransparency = 1
+            holder.ZIndex = 42
+            image.ZIndex = 42
+            table.insert(fading, { image, "ImageTransparency", 0 })
+            titleOffset = 24
+        end
     end
     local title = label({
         Position = UDim2.fromOffset(PAD + titleOffset, PAD),
@@ -5084,7 +5382,7 @@ function Window:Toggle(open)
     else
 
         tween(self.Scale, { Scale = (self._fitScale or 1) * 0.94 }, 0.2, Enum.EasingStyle.Quint)
-        tween(self.Body, { GroupTransparency = 1 }, 0.16)
+        self:_fadeBody(false, 0.16)
         tween(self.BodyStroke, { Transparency = 1 }, 0.12)
         tween(self.Shadow, { ImageTransparency = 1 }, 0.16)
         task.delay(0.2, function()
@@ -5161,8 +5459,13 @@ function Window:Notify(opts)
 
     local titleOffset = 0
     if opts.Icon then
-        glowIcon(inner, opts.Icon, titleColor == Theme.Text and Theme.Accent or titleColor, UDim2.new(0, 0, 0, 8))
-        titleOffset = 24
+        if opts.Color then
+            iconBadge(inner, opts.Icon, opts.Color, UDim2.new(0, 0, 0, 8), 26)
+            titleOffset = 34
+        else
+            glowIcon(inner, opts.Icon, titleColor == Theme.Text and Theme.Accent or titleColor, UDim2.new(0, 0, 0, 8))
+            titleOffset = 24
+        end
     end
     label({
         Position = UDim2.fromOffset(titleOffset, 0),
@@ -5286,7 +5589,7 @@ function Window:Destroy()
     end
     self._connections = {}
     tween(self.Scale, { Scale = 0.9 }, 0.2)
-    tween(self.Body, { GroupTransparency = 1 }, 0.2)
+    self:_fadeBody(false, 0.2)
     tween(self.BodyStroke, { Transparency = 1 }, 0.12)
     tween(self.Shadow, { ImageTransparency = 1 }, 0.2)
     task.delay(0.22, function()
