@@ -585,9 +585,32 @@ local function numberFormat(min, max, step)
 end
 
 local function card(tab, className, height, opts)
+    local grouped = tab._grouped
+
+    local divider
+    if grouped then
+        tab._rows = (tab._rows or 0) + 1
+        if tab._rows > 1 then
+            divider = create("Frame", {
+                Size = UDim2.new(1, 0, 0, 1),
+                BackgroundTransparency = 1,
+                LayoutOrder = tab:_nextOrder(),
+                Parent = tab.List,
+            })
+            create("Frame", {
+                Position = UDim2.fromOffset(14, 0),
+                Size = UDim2.new(1, -28, 1, 0),
+                BackgroundColor3 = Theme.Stroke,
+                BorderSizePixel = 0,
+                Parent = divider,
+            })
+        end
+    end
+
     local props = {
         Size = UDim2.new(1, 0, 0, height),
         BackgroundColor3 = Theme.Surface2,
+        BackgroundTransparency = grouped and 1 or 0,
         BorderSizePixel = 0,
         LayoutOrder = tab:_nextOrder(),
         Parent = tab.List,
@@ -598,6 +621,18 @@ local function card(tab, className, height, opts)
     end
     local frame = create(className, props)
     frame:SetAttribute("NoDrag", true)
+
+    if grouped then
+        local hidden = stroke(frame, Theme.Stroke)
+        hidden.Enabled = false
+        if divider then
+            frame.Destroying:Connect(function()
+                divider:Destroy()
+            end)
+        end
+        return frame, hidden
+    end
+
     corner(frame)
     local frameStroke = stroke(frame, Theme.Stroke)
     return frame, frameStroke
@@ -2692,6 +2727,101 @@ function Tab:ConfigManager(opts)
         end,
     })
     return manager
+end
+
+function Tab:Group(opts)
+    opts = normalize(opts, { Title = "Name", Description = "Desc" })
+
+    local wrapper = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        LayoutOrder = self:_nextOrder(),
+        Parent = self.List,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10),
+        Parent = wrapper,
+    })
+
+    if opts.Name then
+        local hasDesc = opts.Desc ~= nil
+        local header = create("Frame", {
+            Size = UDim2.new(1, 0, 0, hasDesc and 36 or 28),
+            BackgroundTransparency = 1,
+            LayoutOrder = 1,
+            Parent = wrapper,
+        })
+        local textX = 0
+        if opts.Icon then
+            local box = create("Frame", {
+                Size = UDim2.fromOffset(28, 28),
+                BackgroundColor3 = opts.Color or Color3.fromRGB(56, 128, 255),
+                BorderSizePixel = 0,
+                Parent = header,
+            })
+            corner(box, UDim.new(0, 7))
+            local image = create("ImageLabel", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(16, 16),
+                BackgroundTransparency = 1,
+                ImageColor3 = Color3.new(1, 1, 1),
+                ScaleType = Enum.ScaleType.Fit,
+                Parent = box,
+            })
+            applyIcon(image, opts.Icon)
+            textX = 38
+        end
+        label({
+            Position = UDim2.fromOffset(textX, 0),
+            Size = UDim2.new(1, -textX, 0, hasDesc and 18 or 28),
+            Text = opts.Name,
+            TextSize = 15,
+            FontFace = Fonts.Bold,
+            Parent = header,
+        })
+        if hasDesc then
+            label({
+                Position = UDim2.fromOffset(textX, 19),
+                Size = UDim2.new(1, -textX, 0, 16),
+                Text = opts.Desc,
+                TextSize = 13,
+                FontFace = Fonts.Regular,
+                TextColor3 = Theme.Muted,
+                Parent = header,
+            })
+        end
+    end
+
+    local container = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = Theme.Surface2,
+        BorderSizePixel = 0,
+        LayoutOrder = 2,
+        Parent = wrapper,
+    })
+    container:SetAttribute("NoDrag", true)
+    corner(container)
+    stroke(container, Theme.Stroke)
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 0),
+        Parent = container,
+    })
+
+    local group = setmetatable({
+        Name = opts.Name,
+        Window = self.Window,
+        List = container,
+        Frame = wrapper,
+        _order = 0,
+        _rows = 0,
+        _grouped = true,
+    }, Tab)
+    return group
 end
 
 for name, method in pairs(table.clone(Tab)) do
