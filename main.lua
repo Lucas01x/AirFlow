@@ -1444,7 +1444,7 @@ function Tab:Dropdown(opts)
         local list = {}
         for _, v in ipairs(raw) do
             if type(v) == "table" then
-                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model, Color = v.Color })
+                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model, Color = v.Color , IconSize = opts.IconSize })
             else
                 table.insert(list, { Name = tostring(v), Icon = nil })
             end
@@ -1971,7 +1971,7 @@ function Tab:Dropdown(opts)
                 iconImage = iconBadge(row, option.Icon, option.Color, UDim2.new(0, 10, 0.5, 0), 22)
             elseif option.Icon then
                 raw = isRawImage(option.Icon)
-                local size = option.IconSize or raw and 22 or 16
+                local size = option.IconSize or ( raw and 22 or 16 )
                 iconImage = create("ImageLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Position = UDim2.new(0, 21, 0.5, 0),
