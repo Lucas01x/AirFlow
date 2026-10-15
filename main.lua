@@ -1540,7 +1540,16 @@ function Tab:Dropdown(opts)
         TextSize = 13,
         Parent = chip,
     })
-
+    local chipIcon = create("ImageLabel", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 9, 0.5, 0),
+        Size = UDim2.fromOffset(16, 16),
+        BackgroundTransparency = 1,
+        ImageColor3 = Theme.Text,
+        ScaleType = Enum.ScaleType.Fit,
+        Visible = false,
+        Parent = chip,
+    })
     local measure = label({
         Position = UDim2.fromOffset(-2000, 0),
         Size = UDim2.new(0, 0, 1, 0),
@@ -1817,7 +1826,7 @@ function Tab:Dropdown(opts)
         end
     end
 
-    local function updateChip(instant)
+        local function updateChip(instant)
         local value = currentValue()
         local count = 0
         local fullText
@@ -1830,6 +1839,28 @@ function Tab:Dropdown(opts)
         local hasValue = (multi and count > 0) or (not multi and value ~= nil)
         valueLabel.Text = fullText
         valueLabel.TextColor3 = hasValue and Theme.Text or Theme.Muted
+        local iconOffset = 0
+        local iconSource
+        if not multi and value ~= nil then
+            for _, option in ipairs(options) do
+                if option.Name == value then
+                    iconSource = option.Icon
+                    break
+                end
+            end
+        end
+        if iconSource and typeof(iconSource) ~= "Instance" then
+            local raw = isRawImage(iconSource)
+            chipIcon.Image = ""
+            chipIcon.ImageRectOffset = Vector2.zero
+            chipIcon.ImageRectSize = Vector2.zero
+            chipIcon.ImageColor3 = raw and Color3.new(1, 1, 1) or Theme.Text
+            setIcon(chipIcon, iconSource)
+            chipIcon.Visible = true
+            iconOffset = 26
+        else
+            chipIcon.Visible = false
+        end
 
         local reserve = 28
         if multi and count > 0 then
@@ -1843,12 +1874,13 @@ function Tab:Dropdown(opts)
             countBadge.Visible = false
             clearButton.Visible = false
         end
-        valueLabel.Size = UDim2.new(1, -(10 + reserve), 1, 0)
+        valueLabel.Position = UDim2.fromOffset(10 + iconOffset - (iconOffset > 0 and 2 or 0), 0)
+        valueLabel.Size = UDim2.new(1, -(10 + iconOffset + reserve), 1, 0)
 
         measure.Text = fullText
         local cardW = frame.AbsoluteSize.X / self.Window.Scale.Scale
         local maxChip = cardW > 0 and math.clamp(cardW - 14 - 100 - 20, 100, MAX_CHIP) or MAX_CHIP
-        local width = math.clamp(measure.TextBounds.X + 10 + reserve + 2, 70, maxChip)
+        local width = math.clamp(measure.TextBounds.X + 10 + iconOffset + reserve + 2, 70, maxChip)
         reserveRight(titleLabel, descLabel, width + 20)
         if instant then
             chip.Size = UDim2.fromOffset(width, CHIP_HEIGHT)
