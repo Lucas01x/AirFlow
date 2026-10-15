@@ -1427,7 +1427,7 @@ function Tab:Slider(opts)
 end
 
 function Tab:Dropdown(opts)
-    opts = normalize(opts, { Title = "Name", Description = "Desc", CurrentOption = "Default", Value = "Default", MultipleOptions = "Multi", Values = "Options" })
+    opts = normalize(opts, { Title = "Name", Description = "Desc", CurrentOption = "Default", Value = "Default", MultipleOptions = "Multi", Values = "Options" , IconSize = 22 })
     if opts.Multi and type(opts.Default) ~= "table" and opts.Default ~= nil then
         opts.Default = { opts.Default }
     elseif not opts.Multi and type(opts.Default) == "table" then
@@ -1971,7 +1971,7 @@ function Tab:Dropdown(opts)
                 iconImage = iconBadge(row, option.Icon, option.Color, UDim2.new(0, 10, 0.5, 0), 22)
             elseif option.Icon then
                 raw = isRawImage(option.Icon)
-                local size = raw and 22 or 16
+                local size = option.IconSize or raw and 22 or 16
                 iconImage = create("ImageLabel", {
                     AnchorPoint = Vector2.new(0.5, 0.5),
                     Position = UDim2.new(0, 21, 0.5, 0),
@@ -3046,8 +3046,8 @@ function Tab:Group(opts)
             -- })
             -- applyIcon(image, opts.Icon)
             -- textX = 38
-            iconBadge(header, opts.Icon, opts.Color or Color3.fromRGB(56, 128, 255), UDim2.new(0, 2, 0, 18), 33)
-            textX = 45
+            iconBadge(header, opts.Icon, opts.Color or Color3.fromRGB(56, 128, 255), UDim2.new(0, 0, 0, 25), 28)
+            textX = 38
         end
         label({
             Position = UDim2.fromOffset(textX, 0),
