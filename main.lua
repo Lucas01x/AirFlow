@@ -1444,7 +1444,7 @@ function Tab:Dropdown(opts)
         local list = {}
         for _, v in ipairs(raw) do
             if type(v) == "table" then
-                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model, Color = v.Color , IconSize = opts.IconSize })
+                table.insert(list, { Name = v.Name or v.Title or "Option", Icon = v.Icon or v.Model, Color = v.Color, TextColor = v.TextColor, IconSize = opts.IconSize })
             else
                 table.insert(list, { Name = tostring(v), Icon = nil })
             end
@@ -1826,7 +1826,7 @@ function Tab:Dropdown(opts)
         end
     end
 
-        local function updateChip(instant)
+    local function updateChip(instant)
         local value = currentValue()
         local count = 0
         local fullText
@@ -1838,7 +1838,16 @@ function Tab:Dropdown(opts)
         end
         local hasValue = (multi and count > 0) or (not multi and value ~= nil)
         valueLabel.Text = fullText
-        valueLabel.TextColor3 = hasValue and Theme.Text or Theme.Muted
+        local chipTextColor = hasValue and Theme.Text or Theme.Muted
+        if not multi and value ~= nil then
+            for _, option in ipairs(options) do
+                if option.Name == value and option.TextColor then
+                    chipTextColor = option.TextColor
+                    break
+                end
+            end
+        end
+        valueLabel.TextColor3 = chipTextColor
         local iconOffset = 0
         local iconSource
         if not multi and value ~= nil then
@@ -1899,7 +1908,7 @@ function Tab:Dropdown(opts)
         for name, button in pairs(optionButtons) do
             local on = selected[name] == true
             local d = animate and 0.15 or 0
-            tween(button.Label, { TextColor3 = on and Theme.Text or Theme.Muted }, d)
+            tween(button.Label, { TextColor3 = button.TextColor or (on and Theme.Text or Theme.Muted) }, d)
             tween(button.Check, { ImageTransparency = on and 0 or 1 }, d)
             tween(button.CheckScale, { Scale = on and 1 or 0.6 }, animate and (on and 0.3 or 0.15) or 0, on and Enum.EasingStyle.Back or Enum.EasingStyle.Quint)
             if button.Icon and not button.Raw then
@@ -2024,7 +2033,7 @@ function Tab:Dropdown(opts)
                 Size = UDim2.new(1, -(textOffset + 30), 1, 0),
                 Text = option.Name,
                 TextSize = 13,
-                TextColor3 = Theme.Muted,
+                TextColor3 = option.TextColor or Theme.Muted,
                 Parent = row,
             })
             local check = create("ImageLabel", {
@@ -2042,7 +2051,9 @@ function Tab:Dropdown(opts)
 
             row.MouseEnter:Connect(function()
                 tween(row, { BackgroundTransparency = 0.45 }, 0.12)
-                tween(text_, { TextColor3 = Theme.Text }, 0.12)
+                if not option.TextColor then
+                    tween(text_, { TextColor3 = Theme.Text }, 0.12)
+                end
                 if iconImage and not raw then
                     tween(iconImage, { ImageColor3 = Theme.Text }, 0.12)
                 end
@@ -2050,7 +2061,9 @@ function Tab:Dropdown(opts)
             row.MouseLeave:Connect(function()
                 local on = selected[option.Name] == true
                 tween(row, { BackgroundTransparency = 1 }, 0.2)
-                tween(text_, { TextColor3 = on and Theme.Text or Theme.Muted }, 0.2)
+                if not option.TextColor then
+                    tween(text_, { TextColor3 = on and Theme.Text or Theme.Muted }, 0.2)
+                end
                 if iconImage and not raw then
                     tween(iconImage, { ImageColor3 = on and Theme.Text or Theme.Muted }, 0.2)
                 end
@@ -2072,7 +2085,7 @@ function Tab:Dropdown(opts)
                 end
             end)
 
-            optionButtons[option.Name] = { Frame = row, Label = text_, Check = check, CheckScale = checkScale, Icon = iconImage, Raw = raw }
+            optionButtons[option.Name] = { Frame = row, Label = text_, Check = check, CheckScale = checkScale, Icon = iconImage, Raw = raw, TextColor = option.TextColor }
         end
         noResults.Visible = #options > 0 and visibleCount() == 0
         layout(0.2)
